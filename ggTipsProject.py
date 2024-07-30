@@ -74,51 +74,45 @@ weeklyTips = tips.groupby("weekNumber").agg({
 }).reset_index().rename(columns={"Amount": "Sum of amount", "companyPartner": "Count"})
 
 
-
 st.header("ggTips")
 
 # Create bar chart for sum of amount
-fig_sum = px.bar(weeklyTips, x='weekNumber', y='Sum of amount',
+weeklyAmountGraph = px.bar(weeklyTips, x='weekNumber', y='Sum of amount',
                     title='Weekly Sum of Amount',
                     labels={'value': 'Values', 'variable': 'Metrics'},
                     color_discrete_sequence=['green'],
                     )  # Change colors here
 
-fig_sum.update_traces(
-    texttemplate="%{y:․0f}",
-    textposition='outside',
-    hovertemplate="<b>Week Number:</b> %{x}<br><b>Sum of Amount:</b> %{y}<extra></extra>",
-    hoverlabel=dict(
-        bgcolor="black",
-        font_size=15
-        # font_family="Rockwell"
-    )
-)
-
-fig_sum.update_layout({
-    'plot_bgcolor': 'rgba(0, 0, 0, 0)',
-    'paper_bgcolor': 'rgba(0, 0, 0, 0)',
-    'font': {'color': 'white'},  # Change font color to white
-    'width': 1000,  # Set the width
-    'height': 400,  # Set the height
-})
-
-# Create bar chart for count
-fig_count = px.bar(weeklyTips, x='weekNumber', y='Count',
+WeeklyCountGraph = px.bar(weeklyTips, x='weekNumber', y='Count',
                     title='Weekly Transaction Count',
                     labels={'value': 'Values', 'variable': 'Metrics'},
                     color_discrete_sequence=['blue'])  # Change colors here
 
-fig_count.update_layout({
-    'plot_bgcolor': 'rgba(0, 0, 0, 0)',
-    'paper_bgcolor': 'rgba(0, 0, 0, 0)',
-    'font': {'color': 'white'},  # Change font color to white
-    'width': 800,  # Set the width
-    'height': 400  # Set the height
-})
+graphs = [weeklyAmountGraph, WeeklyCountGraph]
 
-click_event_sum = plotly_events(fig_sum)
-click_event_count = plotly_events(fig_count)
+for graph in graphs:
+    graph.update_traces(
+        texttemplate="%{y:․0f}",
+        textposition='outside',
+        hovertemplate="<b>Week Number:</b> %{x}<br><b>Sum of Amount:</b> %{y}<extra></extra>",
+        hoverlabel=dict(
+            bgcolor="black",
+            font_size=15
+            # font_family="Rockwell"
+        )
+    )
+
+    graph.update_layout({
+        'plot_bgcolor': 'rgba(0, 0, 0, 0)',
+        'paper_bgcolor': 'rgba(0, 0, 0, 0)',
+        'font': {'color': 'white'},  # Change font color to white
+        'width': 1000,  # Set the width
+        'height': 400,  # Set the height
+    })
+
+
+click_event_sum = plotly_events(weeklyAmountGraph)
+click_event_count = plotly_events(WeeklyCountGraph)
 
 if click_event_sum:
     week_num = click_event_sum[0]['x']
