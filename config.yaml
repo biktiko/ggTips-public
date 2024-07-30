@@ -1,0 +1,15 @@
+credentials:
+  usernames:
+    johndoe:
+      email: btigran02@gmail.com
+      name: Tigran
+      password: $2b$12$UsRzVquBhB7TeCQO9AfAEuQEiKLLxM49hiqlOXnJ.Jv7zqMnPfje6
+    janesmith:
+      email: janesmith@example.com
+      name: Jane Smith
+      password: $2b$12$OlV81cEVkjeeR7biy7cybu5KQRrcYA8gBvizKCDW3xe7BNYDSy.IK
+
+cookie:
+  expiry_days: 30
+  key: some_signature_key
+  name: some_cookie_name
