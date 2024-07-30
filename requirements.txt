@@ -1,5 +1,4 @@
+streamlit
 pandas
-numpy
-matplotlib
-seaborn
-openpyxl
+plotly
+streamlit-plotly-events
