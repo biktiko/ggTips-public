@@ -7,7 +7,7 @@ from data.ggTipsData import load_data
 # Read data
 data = load_data()
 tips = data["tips"]
-defaultInputs = data["defaultInputs"]
+defaultInputs = data['defaultInputs']
 
 # Initialize session state for filters
 if 'selected_month' not in st.session_state:
@@ -23,27 +23,31 @@ if 'amountFilterMax' not in st.session_state:
 
 # Function to reset filters
 def reset_filters():
-    st.session_state['selected_month'] = defaultInputs['default_month']
+    st.session_state['selected_month'] = str(defaultInputs['default_month'])
     st.session_state['ggPayeers'] = defaultInputs['default_ggPayeers']
     st.session_state['Payment_processor'] = defaultInputs['default_payment_processor']
     st.session_state['amountFilterMin'] = defaultInputs['default_amount_min']
     st.session_state['amountFilterMax'] = defaultInputs['default_amount_max']
+    st.experimental_rerun()
 
 # Create Streamlit app
 st.set_page_config(layout="wide")
 st.title("ggTips")
 
 # Add month selection
-months = {0: "All", 1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'}
-selected_month = st.selectbox("Select month", list(months.keys()), format_func=lambda x: months[x], index=st.session_state['selected_month'], key='selected_month')
+months = ["All", 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+selected_month = st.selectbox("Select month", months, index=months.index(st.session_state['selected_month']), key='selected_month')
 
 col1, col2 = st.columns(2)
 
+ggPayeersOptions = ["All", "Wihout gg teammates", "Only gg teammates"]
+paymentProcessorOptions = ["All"] + list(tips["PaymentProcessor"].unique())
+
 with col1:
-    ggPayeers = st.selectbox("ggPayers", ("All", "Wihout gg teammates", "Only gg teammates"), index=st.session_state['ggPayeers'], key='ggPayeers')
+    ggPayeers = st.selectbox("ggPayers", ggPayeersOptions, index=ggPayeersOptions.index(st.session_state['ggPayeers']), key='ggPayeers')
 
 with col2:
-    Payment_processor = st.selectbox("Payment Processor", (["All"] + list(tips["PaymentProcessor"].unique())), index=st.session_state['Payment_processor'], key='Payment_processor')
+    Payment_processor = st.selectbox("Payment Processor", paymentProcessorOptions, index=paymentProcessorOptions.index(st.session_state['Payment_processor']), key='Payment_processor')
 
 with st.expander("More filters"):
     col3, col4 = st.columns(2)
@@ -57,16 +61,19 @@ with st.expander("More filters"):
 # Add Reset Filters button
 if st.button('Reset Filters'):
     reset_filters()
-    st.experimental_rerun()
 
 # Filter data based on selected month
-if selected_month > 0:
-    tips = tips[tips['month'] == selected_month]
+
+if selected_month != "All":
+    month_index = months.index(selected_month)
+    tips = tips[tips['month'] == month_index]
 
 weeklyTips = tips.groupby("weekNumber").agg({
     "Amount": "sum",
     "companyPartner": "count"
 }).reset_index().rename(columns={"Amount": "Sum of amount", "companyPartner": "Count"})
+
+
 
 st.header("ggTips")
 

@@ -33,9 +33,9 @@ def load_data():
     filtered_tips = filtered_tips[filtered_tips['Date'].dt.year > 2023]
 
     defaultInputs = {
-        "default_month": 0,
-        "default_ggPayeers": 1,  # Update to index
-        "default_payment_processor": 0,
+        "default_month": "All",
+        "default_ggPayeers": "Wihout gg teammates",  # Update to index
+        "default_payment_processor": 'All',
         "default_amount_min": 110,
         "default_amount_max": 50000
     }
