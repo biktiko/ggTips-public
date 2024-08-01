@@ -2,11 +2,11 @@ import pandas as pd
 
 def load_data():
 
-    file_path = "data/ggTips admin.xlsx"
+    file_path = 'data/ggTips admin.xlsx'
     try:
         xls = pd.ExcelFile(file_path)
     except FileNotFoundError:
-        raise FileNotFoundError(f"{file_path} not found")
+        raise FileNotFoundError(f'{file_path} not found')
 
     sheets = xls.sheet_names
 
@@ -20,24 +20,31 @@ def load_data():
     # Date configuration
     tips['Date'] = pd.to_datetime(tips['Date'])
     tips['weekNumber'] = tips['Date'].dt.isocalendar().week
+    tips['hour'] = tips['Date'].dt.hour
+    tips['day'] = tips['Date'].dt.day
     tips['month'] = tips['Date'].dt.month
     tips['year'] = tips['Date'].dt.year
+    tips['weekday'] = tips['Date'].dt.weekday
 
     # Unique Company name
     tips['Company name'] = tips['Company name'].astype(str)
     tips['Partner name'] = tips['Partner name'].astype(str)
-    tips["companyPartner"] = tips["Company name"] + "_" + tips["Partner name"]
+    tips['companyPartner'] = tips['Company name'] + '_' + tips['Partner name']
 
     # Date filters
     filtered_tips = tips[tips['Amount'] > 100]
     filtered_tips = filtered_tips[filtered_tips['Date'].dt.year > 2023]
 
     defaultInputs = {
-        "default_month": "All",
-        "default_ggPayeers": "Wihout gg teammates",  # Update to index
-        "default_payment_processor": 'All',
-        "default_amount_min": 110,
-        "default_amount_max": 50000
+        'selectedMonth': [],
+        'ggPayeers': 'Wihout gg teammates',
+        'amountFilterMin': 110,
+        'amountFilterMax': 50000,
+        'timeInterval': 'Week',
+        'paymentProcessor': [],
+        'paymentStatus': ['finished'],
+        'selectedCompanies': [],
+        'selectedPartner': []
     }
 
     data = {

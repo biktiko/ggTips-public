@@ -6,26 +6,17 @@ import yaml
 from yaml.loader import SafeLoader
 from data.ggTipsData import load_data
 import streamlit_authenticator as stauth
-from streamlit_authenticator.utilities.exceptions import (CredentialsError,
-                                                          ForgotError,
-                                                          LoginError,
-                                                          RegisterError,
-                                                          ResetError,
-                                                          UpdateError) 
+from streamlit_authenticator.utilities.exceptions import LoginError
 
-# Хеширование паролей (выполните это один раз и обновите конфигурационный файл)
-# passwords = ['5cf5c7ca60_T', 'some_other_password']
+# passwords = ['verch@ _T', 'some_other_password']
 # hashed_passwords = stauth.Hasher(passwords).generate()
 # print(hashed_passwords)
 
-st.set_page_config(layout="wide")
-
+st.set_page_config(layout='wide')
 
 # Loading config file
 with open('config.yaml', 'r', encoding='utf-8') as file:
     config = yaml.load(file, Loader=SafeLoader)
-
-import streamlit_authenticator as stauth
 
 # Creating the authenticator object
 authenticator = stauth.Authenticate(
@@ -41,87 +32,140 @@ try:
 except LoginError as e:
     st.error(e)
 
-if st.session_state["authentication_status"]:
+if st.session_state['authentication_status']:
 
-    # Read data
     data = load_data()
-    tips = data["tips"]
+    tips = data['tips']
     defaultInputs = data['defaultInputs']
 
-    # Initialize session state for filters
-    if 'selected_month' not in st.session_state:
-        st.session_state['selected_month'] = defaultInputs['default_month']
-    if 'ggPayeers' not in st.session_state:
-        st.session_state['ggPayeers'] = defaultInputs['default_ggPayeers']
-    if 'Payment_processor' not in st.session_state:
-        st.session_state['Payment_processor'] = defaultInputs['default_payment_processor']
-    if 'amountFilterMin' not in st.session_state:
-        st.session_state['amountFilterMin'] = defaultInputs['default_amount_min']
-    if 'amountFilterMax' not in st.session_state:
-        st.session_state['amountFilterMax'] = defaultInputs['default_amount_max']
+    for setting in defaultInputs.keys():
+        if setting not in st.session_state:
+            st.session_state[setting] = defaultInputs[setting]
 
-    # Function to reset filters
-    def reset_filters():
-        st.session_state['selected_month'] = str(defaultInputs['default_month'])
-        st.session_state['ggPayeers'] = defaultInputs['default_ggPayeers']
-        st.session_state['Payment_processor'] = defaultInputs['default_payment_processor']
-        st.session_state['amountFilterMin'] = defaultInputs['default_amount_min']
-        st.session_state['amountFilterMax'] = defaultInputs['default_amount_max']
-        st.experimental_rerun()
+    # st.write(tips)
 
-    # Create Streamlit app
-    st.title("ggTips")
+    st.title('ggTips')
 
-    # Add month selection
-    months = ["All", 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-    selected_month = st.selectbox("Select month", months, index=months.index(st.session_state['selected_month']), key='selected_month')
+    companiesOptions = list(tips['Company name'].unique())
+    partnersOptions = list(tips['Partner name'].unique())
+    ggPayeersOptions = ['All', 'Wihout gg teammates', 'Only gg teammates']
+    paymentProcessorOptions = list(tips['PaymentProcessor'].unique())
+    paymentStatusOptions = list(tips['status'].unique())
+    months = {
+        'January': 1,
+        'February': 2,
+        'March': 3,
+        'April': 4,
+        'May': 5,
+        'June': 6,
+        'July': 7,
+        'August': 8,
+        'September': 9,
+        'October': 10,
+        'November': 11,
+        'December': 12,
+    }
 
     col1, col2 = st.columns(2)
 
-    ggPayeersOptions = ["All", "Wihout gg teammates", "Only gg teammates"]
-    paymentProcessorOptions = ["All"] + list(tips["PaymentProcessor"].unique())
-
     with col1:
-        ggPayeers = st.selectbox("ggPayers", ggPayeersOptions, index=ggPayeersOptions.index(st.session_state['ggPayeers']), key='ggPayeers')
+        st.multiselect('Select companies', companiesOptions, key='selectedCompanies')
 
     with col2:
-        Payment_processor = st.selectbox("Payment Processor", paymentProcessorOptions, index=paymentProcessorOptions.index(st.session_state['Payment_processor']), key='Payment_processor')
+        st.multiselect('Select partners', partnersOptions, key='selectedPartners')
 
-    with st.expander("More filters"):
-        col3, col4 = st.columns(2)
+    st.multiselect('Select month', list(months.keys()), key='selectedMonth')
+
+    timeIntervalOptions = ['All', 'Week', 'Month', 'Year', 'Week day', 'Day', 'Hour', 'Custom day']
+
+    if 'timeInterval' not in st.session_state:
+        st.selectbox('Time interval', timeIntervalOptions, index=1, key='timeInterval')
+    else:
+        if st.session_state['timeInterval'] != 'custom day':
+            st.selectbox('Time interval', timeIntervalOptions, index=1, key='timeInterval')
+        else:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.selectbox('Time interval', timeIntervalOptions, index=4, key='timeInterval')
+
+            with col2:
+                st.number_input('Custom', value=10, step=1, min_value=1)  # set max value
+
+    with st.expander('More filters'):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.selectbox('ggPayers', ggPayeersOptions, key='ggPayeers')
+
+        with col2:
+            st.multiselect('Payment Processor', paymentProcessorOptions, default=st.session_state['paymentProcessor'], key='paymentProcessor')
 
         with col3:
-            amountFilterMin = st.number_input("Min amount", value=st.session_state['amountFilterMin'], step=1000, min_value=100, max_value=50000, key='amountFilterMin')
+            st.multiselect('Payment Status', paymentStatusOptions, default=st.session_state['paymentStatus'], key='paymentStatus')
 
-        with col4:
-            amountFilterMax = st.number_input("Max amount", value=st.session_state['amountFilterMax'], step=1000, min_value=amountFilterMin, max_value=50000, key='amountFilterMax')
+        col1, col2 = st.columns(2)
+        with col1:
+            st.number_input('Min amount', value=st.session_state['amountFilterMin'], step=1000, min_value=0, max_value=50000, key='amountFilterMin')
 
-    # Add Reset Filters button
-    if st.button('Reset Filters'):
-        reset_filters()
+        with col2:
+            st.number_input('Max amount', value=st.session_state['amountFilterMax'], step=1000, min_value=st.session_state['amountFilterMin'], max_value=50000, key='amountFilterMax')
 
-    # Filter data based on selected month
-    if selected_month != "All":
-        month_index = months.index(selected_month)
-        tips = tips[tips['month'] == month_index]
 
-    weeklyTips = tips.groupby("weekNumber").agg({
-        "Amount": "sum",
-        "companyPartner": "count"
-    }).reset_index().rename(columns={"Amount": "Sum of amount", "companyPartner": "Count"})
+    def setFilters():
+        filteredTips = tips.copy()
 
-    st.header("Сharts")
+        if st.session_state['selectedCompanies']:
+            filteredTips = filteredTips[filteredTips['Company name'].isin(st.session_state['selectedCompanies'])]
+        if st.session_state['selectedMonth']:
+            month_indices = [months[month] for month in st.session_state['selectedMonth']]
+            filteredTips = filteredTips[filteredTips['month'].isin(month_indices)]
+        if st.session_state['paymentStatus']:
+            filteredTips = filteredTips[filteredTips['status'].isin(st.session_state['paymentStatus'])]
+        if st.session_state['paymentProcessor']:
+            filteredTips = filteredTips[filteredTips['PaymentProcessor'].isin(st.session_state['paymentProcessor'])]
+        filteredTips = filteredTips[(filteredTips['Amount'] >= st.session_state['amountFilterMin']) & (filteredTips['Amount'] <= st.session_state['amountFilterMax'])]
+
+        return filteredTips
+
+    
+    filteredTips = setFilters()
+
+    def tipsGroupBy(tips, timeInterval):
+        groupedTips = tips.groupby(timeInterval).agg({
+            'Amount': 'sum',
+            'companyPartner': 'count'
+        }).reset_index().rename(columns={'Amount': 'Sum of amount', 'companyPartner': 'Count'})
+
+        return groupedTips
+    
+    if st.session_state['timeInterval'] == 'Hour':
+        groupedTips = tipsGroupBy(filteredTips, 'hour')
+    if st.session_state['timeInterval'] == 'Week day':
+        groupedTips = tipsGroupBy(filteredTips, 'weekday')
+    if st.session_state['timeInterval'] == 'Day':
+        groupedTips = tipsGroupBy(filteredTips, 'day')
+    if st.session_state['timeInterval'] == 'Week':
+        groupedTips = tipsGroupBy(filteredTips, 'weekNumber')
+    elif st.session_state['timeInterval'] == 'Month':
+        groupedTips = tipsGroupBy(filteredTips, 'month')
+    elif st.session_state['timeInterval'] == 'Year':
+        groupedTips = tipsGroupBy(filteredTips, 'year')
+
+    if st.button('Clear Filters'):
+        for setting in defaultInputs.keys():
+            st.session_state[setting] = defaultInputs[setting]
+        st.experimental_rerun()
+
+    st.header('Сharts')
 
     # Graphiks
-    weeklyAmountGraph = px.bar(weeklyTips, x='weekNumber', y='Sum of amount',
-                            title='Weekly Sum of Amount',
-                            labels={'value': 'Values', 'variable': 'Metrics'},
+    weeklyAmountGraph = px.bar(groupedTips, x=groupedTips.columns[0], y='Sum of amount',
+                            title='Amount',
                             color_discrete_sequence=['green'],
                         )
 
-    WeeklyCountGraph = px.bar(weeklyTips, x='weekNumber', y='Count',
-                            title='Weekly Transaction Count',
-                            labels={'value': 'Values', 'variable': 'Metrics'},
+    WeeklyCountGraph = px.bar(groupedTips, x=groupedTips.columns[0], y='Count',
+                            title='Tips count',
                             color_discrete_sequence=['blue']
                         )
     
@@ -129,13 +173,13 @@ if st.session_state["authentication_status"]:
 
     for graph in graphs:
         graph.update_traces(
-            texttemplate="%{y:․0f}",
+            texttemplate='%{y:․0f}',
             textposition='outside',
-            hovertemplate="<b>Week Number:</b> %{x}<br><b>Sum of Amount:</b> %{y}<extra></extra>",
+            hovertemplate='<b>Week Number:</b> %{x}<br><b>Sum of Amount:</b> %{y}<extra></extra>',
             hoverlabel=dict(
-                bgcolor="black",
+                bgcolor='black',
                 font_size=15
-                # font_family="Rockwell"
+                # font_family='Rockwell'
             )
         )
 
@@ -144,7 +188,7 @@ if st.session_state["authentication_status"]:
             'paper_bgcolor': 'rgba(0, 0, 0, 0)',
             'font': {'color': 'white'},  # Change font color to white
             'width': 1200,  # Set the width
-            'height': 400,  # Set the height
+            'height': 450,  # Set the height
         })
 
     click_event_sum = plotly_events(weeklyAmountGraph)
@@ -152,8 +196,8 @@ if st.session_state["authentication_status"]:
 
     def callMoreDetailsTable():
         filtered_data = tips[tips['weekNumber'] == week_num]
-        st.write(f"Transactions for week {week_num}")
-        selectedColumns = ["Company name", "Partner name", "Date", "Amount", "PaymentProcessor", "ggPayer"]
+        st.write(f'Transactions for week {week_num}')
+        selectedColumns = ['Company name', 'Partner name', 'Date', 'Amount', 'PaymentProcessor', 'ggPayer']
         st.dataframe(filtered_data[selectedColumns])
 
     if click_event_sum:
@@ -165,8 +209,8 @@ if st.session_state["authentication_status"]:
 
     authenticator.logout()
 
-elif st.session_state["authentication_status"] == False:
+elif st.session_state['authentication_status'] == False:
     st.error('Username/password is incorrect')
     
-elif st.session_state["authentication_status"] == None:
+elif st.session_state['authentication_status'] == None:
     st.warning('Please enter your username and password')
