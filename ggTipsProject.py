@@ -38,6 +38,7 @@ if st.session_state['authentication_status']:
     data = load_data()
 
     newFilesFolder = './data/uploads/'
+    os.makedirs(newFilesFolder, exist_ok=True)
 
     with st.expander('Import new data'):
         if 'uploadedFiles' not in st.session_state:
@@ -66,7 +67,7 @@ if st.session_state['authentication_status']:
                 st.write(f"Columns: {', '.join(df.columns)}")
                 st.write(f"Number of rows: {len(df)}")
                 st.write("---")
-                
+
         password = st.text_input('', placeholder="Enter password to clear files", type="password") 
         clearFolderButtonClicked = st.button("Delete all new files", key="clearFolderButton")
 
