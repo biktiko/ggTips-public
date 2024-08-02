@@ -1,12 +1,16 @@
+import streamlit as st
 import pandas as pd
+import os
 
 def load_data():
 
-    file_path = 'data/ggTips admin.xlsx'
+    mainFilePath = 'data/ggTips admin.xlsx'
+    newFilePath = os.path.dirname(__file__)
+
     try:
-        xls = pd.ExcelFile(file_path)
+        xls = pd.ExcelFile(mainFilePath)
     except FileNotFoundError:
-        raise FileNotFoundError(f'{file_path} not found')
+        raise FileNotFoundError(f'{mainFilePath} not found')
 
     sheets = xls.sheet_names
 

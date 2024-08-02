@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -33,16 +34,61 @@ except LoginError as e:
     st.error(e)
 
 if st.session_state['authentication_status']:
-
+    
     data = load_data()
+
+    newFilesFolder = './data/uploads/'
+
+    with st.expander('Import new data'):
+        if 'uploadedFiles' not in st.session_state:
+            st.session_state['uploadedFiles'] = [os.path.join(newFilesFolder, file) for file in os.listdir(newFilesFolder)]
+
+        uploadedFile = st.file_uploader("New data", type=["csv"])
+        if uploadedFile:
+            newFilePath = os.path.join(newFilesFolder, uploadedFile.name)
+            with open(newFilePath, "wb") as f:
+                f.write(uploadedFile.getbuffer())
+            st.success('New data added')
+            st.session_state['uploadedFiles'].append(newFilePath)
+
+        uploadedFiles = st.session_state['uploadedFiles']
+
+        col1, col2 = st.columns(2)
+
+
+        importedFilesDetails = st.checkbox("Imported Files details")
+
+        if importedFilesDetails and uploadedFiles:
+            for file in uploadedFiles:
+                st.write(f"File: {os.path.basename(file)}")
+                st.write(f"Size: {os.path.getsize(file) / 1024:.2f} KB")
+                df = pd.read_csv(file)
+                st.write(f"Columns: {', '.join(df.columns)}")
+                st.write(f"Number of rows: {len(df)}")
+                st.write("---")
+                
+        password = st.text_input('', placeholder="Enter password to clear files", type="password") 
+        clearFolderButtonClicked = st.button("Delete all new files", key="clearFolderButton")
+
+        if clearFolderButtonClicked and password == "1111":
+            for file in os.listdir(newFilesFolder):
+                file_path = os.path.join(newFilesFolder, file)
+                if os.path.isfile(file_path) and file.endswith('.csv'):
+                    os.remove(file_path)
+            st.session_state['uploadedFiles'] = []
+            st.success("Folder cleared")
+            st.experimental_rerun()
+        elif clearFolderButtonClicked:
+            st.error("Incorrect password")
+
+  
+
     tips = data['tips']
     defaultInputs = data['defaultInputs']
 
     for setting in defaultInputs.keys():
         if setting not in st.session_state:
             st.session_state[setting] = defaultInputs[setting]
-
-    # st.write(tips)
 
     st.title('ggTips')
 
@@ -84,8 +130,9 @@ if st.session_state['authentication_status']:
         if st.session_state['timeInterval'] != 'custom day':
             st.selectbox('Time interval', timeIntervalOptions, index=1, key='timeInterval')
         else:
+
             col1, col2 = st.columns(2)
-            
+ 
             with col1:
                 st.selectbox('Time interval', timeIntervalOptions, index=4, key='timeInterval')
 
@@ -94,6 +141,7 @@ if st.session_state['authentication_status']:
 
     with st.expander('More filters'):
         col1, col2, col3 = st.columns(3)
+
         with col1:
             st.selectbox('ggPayers', ggPayeersOptions, key='ggPayeers')
 
@@ -104,6 +152,7 @@ if st.session_state['authentication_status']:
             st.multiselect('Payment Status', paymentStatusOptions, default=st.session_state['paymentStatus'], key='paymentStatus')
 
         col1, col2 = st.columns(2)
+
         with col1:
             st.number_input('Min amount', value=st.session_state['amountFilterMin'], step=1000, min_value=0, max_value=50000, key='amountFilterMin')
 
