@@ -34,7 +34,7 @@ except LoginError as e:
     st.error(e)
 
 if st.session_state['authentication_status']:
-    
+  
     data = load_data()
 
     newFilesFolder = './data/uploads/'
@@ -44,7 +44,7 @@ if st.session_state['authentication_status']:
         if 'uploadedFiles' not in st.session_state:
             st.session_state['uploadedFiles'] = [os.path.join(newFilesFolder, file) for file in os.listdir(newFilesFolder)]
 
-        uploadedFile = st.file_uploader("New data", type=["csv"])
+        uploadedFile = st.file_uploader("New data", type=["csv", 'xlsx'])
         if uploadedFile:
             newFilePath = os.path.join(newFilesFolder, uploadedFile.name)
             with open(newFilePath, "wb") as f:
@@ -63,7 +63,10 @@ if st.session_state['authentication_status']:
             for file in uploadedFiles:
                 st.write(f"File: {os.path.basename(file)}")
                 st.write(f"Size: {os.path.getsize(file) / 1024:.2f} KB")
-                df = pd.read_csv(file)
+                if newFilePath.endswith('.xlsx'):
+                    df = pd.read_excel(newFilePath)
+                else:
+                    df = pd.read_csv(newFilePath)
                 st.write(f"Columns: {', '.join(df.columns)}")
                 st.write(f"Number of rows: {len(df)}")
                 st.write("---")
@@ -74,15 +77,12 @@ if st.session_state['authentication_status']:
         if clearFolderButtonClicked and password == "1111":
             for file in os.listdir(newFilesFolder):
                 file_path = os.path.join(newFilesFolder, file)
-                if os.path.isfile(file_path) and file.endswith('.csv'):
+                if os.path.isfile(file_path):
                     os.remove(file_path)
             st.session_state['uploadedFiles'] = []
-            st.success("Folder cleared")
-            st.experimental_rerun()
+            st.success("Imported data cleared")
         elif clearFolderButtonClicked:
             st.error("Incorrect password")
-
-  
 
     tips = data['tips']
     defaultInputs = data['defaultInputs']
@@ -125,20 +125,17 @@ if st.session_state['authentication_status']:
 
     timeIntervalOptions = ['All', 'Week', 'Month', 'Year', 'Week day', 'Day', 'Hour', 'Custom day']
 
-    if 'timeInterval' not in st.session_state:
-        st.selectbox('Time interval', timeIntervalOptions, index=1, key='timeInterval')
+    if st.session_state['timeInterval'] != 'Custom day':
+        st.selectbox('Time interval', timeIntervalOptions, key='timeInterval')
     else:
-        if st.session_state['timeInterval'] != 'custom day':
-            st.selectbox('Time interval', timeIntervalOptions, index=1, key='timeInterval')
-        else:
 
-            col1, col2 = st.columns(2)
- 
-            with col1:
-                st.selectbox('Time interval', timeIntervalOptions, index=4, key='timeInterval')
+        col1, col2 = st.columns(2)
 
-            with col2:
-                st.number_input('Custom', value=10, step=1, min_value=1)  # set max value
+        with col1:
+            st.selectbox('Time interval', timeIntervalOptions, index=timeIntervalOptions.index("Custom day"), key='timeInterval')
+
+        with col2:
+            st.number_input('Custom', value=10, step=1, min_value=1)  # set max value
 
     with st.expander('More filters'):
         col1, col2, col3 = st.columns(3)
