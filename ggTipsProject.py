@@ -5,7 +5,6 @@ import plotly.express as px
 from streamlit_plotly_events import plotly_events
 import yaml
 from yaml.loader import SafeLoader
-from data.ggTipsData import load_data
 import streamlit_authenticator as stauth
 from streamlit_authenticator.utilities.exceptions import LoginError
 
@@ -196,7 +195,7 @@ if st.session_state['authentication_status']:
     elif st.session_state['timeInterval'] == 'Month':
         groupedTips = tipsGroupBy(filteredTips, 'month')
     elif st.session_state['timeInterval'] == 'Year':
-        groupedTips = tipsGroupBy(filteredTips, 'year')
+        groupedTips = tipsGroupBy(filteredTips, 'year')  # TO OPTIMIZE THIS
 
     if st.button('Clear Filters'):
         for setting in defaultInputs.keys():
