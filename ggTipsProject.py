@@ -5,7 +5,7 @@ import streamlit as st
 import plotly.express as px
 from streamlit_plotly_events import plotly_events
 from data.ggTipsData import load_data, uploadFilesPath
-from ggtipsconfig import login, closeFile
+from ggtipsconfig import login
 
 st.set_page_config(layout='wide')
 

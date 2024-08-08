@@ -3,7 +3,6 @@ import streamlit_authenticator as stauth
 from streamlit_authenticator.utilities.exceptions import LoginError
 import yaml
 from yaml.loader import SafeLoader
-import psutil
 
 # passwords = ['verch@ _T', 'some_other_password']
 # hashed_passwords = stauth.Hasher(passwords).generate()
@@ -28,14 +27,3 @@ def login():
         st.error(e)
 
     return authenticator
-
-
-def closeFile(file_path):
-    for proc in psutil.process_iter():
-        try:
-            for item in proc.open_files():
-                if file_path == item.path:
-                    proc.terminate()
-                    proc.wait()
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
