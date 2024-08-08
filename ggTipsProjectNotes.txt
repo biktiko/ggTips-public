@@ -1,12 +1,8 @@
 - data folter to private 
 instruction: https://stackoverflow.com/questions/25177014/make-some-files-private-in-a-repository
 
-аккаунт - суперадмин - все возможности
-аккаунт - админ, с дефолтными данными но не со всеми функциями
-аккаунт - гость - без дефолтных данных
 
-
-1. Առանձնացնել կոնֆիգուրացիան առանձին էջի
+1. Առանձնացնել կոնֆիգուրացիան առանձին էջի +
 
 2. Տվյալների մշակում
 
@@ -25,9 +21,6 @@ uuid, amount(?) -> Transactions
 working email, avatar, partnerMessage, json_agg, Real? -> Partners
 HELPERcompanyName, Adress, Start, End	Days, 	Past days,	Previous time, Working status -> Company
 
-3.Ադմինի տվյալների հետ աշխատանքի գործիքներ
- 1․ Իգնոր դեֆոլտ ֆայլերը
- 2․ Իգնոր ափլոդ ֆայլերը
- 3․ Ջնջել ափլոդ ֆայլերը
-
 4․ Կետերը՝ քարտեզ
+
+5. reset button
