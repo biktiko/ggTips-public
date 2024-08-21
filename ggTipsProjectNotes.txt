@@ -24,3 +24,10 @@ HELPERcompanyName, Adress, Start, End	Days, 	Past days,	Previous time, Working s
 4․ Կետերը՝ քարտեզ
 
 5. reset button
+
+
+------
+
+1. do options in ggTipsProject.py more dynamice
+2 filters move to ggTipData.py
+3 talbeKeyWords upgrade

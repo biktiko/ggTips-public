@@ -1,5 +1,4 @@
 import os
-import shutil
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -14,7 +13,7 @@ authenticator = login()
 if st.session_state['authentication_status']:
   
     data = load_data()
-
+    
     if 'tips' in data:
         tips = data['tips']
     else:
@@ -48,8 +47,8 @@ if st.session_state['authentication_status']:
                     df = pd.read_excel(file)
                 else:
                     df = pd.read_csv(file)
-                st.write(f"Columns: {', '.join(df.columns)}")
                 st.write(f"Number of rows: {len(df)}")
+                st.write(f"Columns: {', '.join(df.columns)}")
                 st.write("---")
 
         clearFolderButtonClicked = st.button("Delete all new files", key="clearFolderButton")
@@ -92,10 +91,10 @@ if st.session_state['authentication_status']:
         }
         
         options = {
-            'companiesOptions' : list(tips['Company name'].unique()),
-            'partnersOptions' : list(tips['Partner name'].unique()),
-            'paymentProcessorOptions' : list(tips['PaymentProcessor'].unique()),
-            'paymentStatusOptions' : list(tips['status'].unique()),
+            'companiesOptions' : list(tips['Company'].unique()) if 'Company' in tips else ['All'],
+            'partnersOptions' : list(tips['Partner'].unique()) if 'Partner' in tips else ['All'],
+            'paymentProcessorOptions': list(tips['Payment processor'].unique()) if 'Payment processor' in tips else ['All'],
+            'StatusOptions' : list(tips['Status'].unique()) if 'Status' in tips else ['All'],
             'ggPayeersOptions' : ['All', 'Wihout gg teammates', 'Only gg teammates']
         }
 
@@ -133,7 +132,7 @@ if st.session_state['authentication_status']:
                 st.multiselect('Payment Processor', options['paymentProcessorOptions'], default=st.session_state['paymentProcessor'], key='paymentProcessor')
 
             with col3:
-                st.multiselect('Payment Status', options['paymentStatusOptions'], default=st.session_state['paymentStatus'], key='paymentStatus')
+                st.multiselect('Payment Status', options['StatusOptions'], default=st.session_state['Status'], key='Status')
 
             col1, col2 = st.columns(2)
 
@@ -147,20 +146,24 @@ if st.session_state['authentication_status']:
         def setFilters():
             filteredTips = tips.copy()
 
-            if st.session_state['selectedCompanies']:
-                filteredTips = filteredTips[filteredTips['Company name'].isin(st.session_state['selectedCompanies'])]
-            if st.session_state['selectedMonth']:
+            if 'selectedCompanies' in st.session_state and st.session_state['selectedCompanies']:
+                filteredTips = filteredTips[filteredTips['Company'].isin(st.session_state['selectedCompanies'])]
+            if 'selectedMonth' in st.session_state and st.session_state['selectedMonth']:
                 month_indices = [months[month] for month in st.session_state['selectedMonth']]
                 filteredTips = filteredTips[filteredTips['month'].isin(month_indices)]
-            if st.session_state['paymentStatus']:
-                filteredTips = filteredTips[filteredTips['status'].isin(st.session_state['paymentStatus'])]
-            if st.session_state['paymentProcessor']:
-                filteredTips = filteredTips[filteredTips['PaymentProcessor'].isin(st.session_state['paymentProcessor'])]
-            filteredTips = filteredTips[(filteredTips['Amount'] >= st.session_state['amountFilterMin']) & (filteredTips['Amount'] <= st.session_state['amountFilterMax'])]
+            if 'Status' in st.session_state and st.session_state['Status']:
+                filteredTips = filteredTips[filteredTips['Status'].isin(st.session_state['Status'])]
+            if 'paymentProcessor' in st.session_state and st.session_state['paymentProcessor']:
+                filteredTips = filteredTips[filteredTips['Payment Processor'].isin(st.session_state['paymentProcessor'])]
+            if  'Amount' in filteredTips and 'amountFilterMin' in st.session_state and 'amountFilterMax' in st.session_state:
+                filteredTips = filteredTips[
+                    (filteredTips['Amount'] >= st.session_state['amountFilterMin']) &
+                    (filteredTips['Amount'] <= st.session_state['amountFilterMax'])
+                ]
 
             return filteredTips
-
-        filteredTips = setFilters()
+        
+        filteredTips = setFilters()        
 
         def tipsGroupBy(tips, timeInterval):
             groupedTips = tips.groupby(timeInterval).agg({
@@ -188,59 +191,44 @@ if st.session_state['authentication_status']:
                 st.session_state[setting] = defaultInputs[setting]
             st.experimental_rerun()
 
-        st.header('Сharts')
+        st.header('Chart')
 
-        # Graphiks
-        weeklyAmountGraph = px.bar(groupedTips, x=groupedTips.columns[0], y='Sum of amount',
-                                title='Amount',
+        graph = px.bar(groupedTips, x=groupedTips.columns[0], y='Sum of amount',
+                                title='Count',
                                 color_discrete_sequence=['green'],
-                            )
-
-        WeeklyCountGraph = px.bar(groupedTips, x=groupedTips.columns[0], y='Count',
-                                title='Tips count',
-                                color_discrete_sequence=['blue']
-                            )
+                        )
         
-        graphs = [weeklyAmountGraph, WeeklyCountGraph]
-
-        for graph in graphs:
-            graph.update_traces(
-                texttemplate='%{y:․0f}',
-                textposition='outside',
-                hovertemplate='<b>Week Number:</b> %{x}<br><b>Sum of Amount:</b> %{y}<extra></extra>',
-                hoverlabel=dict(
-                    bgcolor='black',
-                    font_size=15
-                    # font_family='Rockwell'
-                )
+        graph.update_traces(
+            texttemplate='%{y:․0f}',
+            textposition='outside',
+            hovertemplate='<b>Week Number:</b> %{x}<br><b>Sum of Amount:</b> %{y}<extra></extra>',
+            hoverlabel=dict(
+                bgcolor='black',
+                font_size=15
+                # font_family='Rockwell'
             )
+        )
 
-            graph.update_layout({
-                'plot_bgcolor': 'rgba(0, 0, 0, 0)',
-                'paper_bgcolor': 'rgba(0, 0, 0, 0)',
-                'font': {'color': 'white'},  # Change font color to white
-                'width': 1200,  # Set the width
-                'height': 450,  # Set the height
-            })
+        graph.update_layout({
+            'plot_bgcolor': 'rgba(0, 0, 0, 0)',
+            'paper_bgcolor': 'rgba(0, 0, 0, 0)',
+            'font': {'color': 'white'},  # Change font color to white
+            'width': 1200,  # Set the width
+            'height': 420,  # Set the height
+        })
 
-        click_event_sum = plotly_events(weeklyAmountGraph)
-        click_event_count = plotly_events(WeeklyCountGraph)
+        click_event = plotly_events(graph)
 
-        def callMoreDetailsTable():
+        if click_event:
+            week_num = click_event[0]['x']
             filtered_data = tips[tips['weekNumber'] == week_num]
             st.write(f'Transactions for week {week_num}')
-            selectedColumns = ['Company name', 'Partner name', 'Date', 'Amount', 'PaymentProcessor', 'ggPayer']
-            st.dataframe(filtered_data[selectedColumns])
-
-        if click_event_sum:
-            week_num = click_event_sum[0]['x']
-            callMoreDetailsTable()
-        elif click_event_count:
-            week_num = click_event_count[0]['x']
-            callMoreDetailsTable()
+            # selectedColumns = ['Company', 'Partner', 'Date', 'Amount', 'PaymentProcessor', 'ggPayer']
+            st.dataframe(filtered_data)
+               
     else:
         st.write("import data about ggTips product for analyze")
-
+    
     authenticator.logout()
 
 elif st.session_state['authentication_status'] == False:
