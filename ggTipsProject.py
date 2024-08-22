@@ -14,10 +14,13 @@ if st.session_state['authentication_status']:
   
     data = load_data()
     
-    if 'tips' in data:
-        tips = data['tips']
-    else:
-        tips = pd.DataFrame()
+    tips = data['tips']
+    defaultInputs = data['defaultInputs']
+    ggTeammates = data['ggTeammates']
+        
+    for setting in defaultInputs.keys():
+        if setting not in st.session_state:
+            st.session_state[setting] = defaultInputs[setting]
 
     os.makedirs(uploadFilesPath, exist_ok=True)
 
@@ -66,12 +69,6 @@ if st.session_state['authentication_status']:
                         except Exception as e:
                             st.error(f"Unexpected error when deleting {file_path}: {e}")
 
-    defaultInputs = data['defaultInputs']
-
-    for setting in defaultInputs.keys():
-        if setting not in st.session_state:
-            st.session_state[setting] = defaultInputs[setting]
-
     st.title('ggTips')
 
     if 'tips' in data:
@@ -106,23 +103,25 @@ if st.session_state['authentication_status']:
         with col2:
             st.multiselect('Select partners', options['partnersOptions'], key='selectedPartners')
 
-        st.multiselect('Select month', list(months.keys()), key='selectedMonth')
-
-        timeIntervalOptions = ['All', 'Week', 'Month', 'Year', 'Week day', 'Day', 'Hour', 'Custom day']
-
-        if st.session_state['timeInterval'] != 'Custom day':
-            st.selectbox('Time interval', timeIntervalOptions, key='timeInterval')
-        else:
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.selectbox('Time interval', timeIntervalOptions, index=timeIntervalOptions.index("Custom day"), key='timeInterval')
-
-            with col2:
-                st.number_input('Custom', value=10, step=1, min_value=1)  # set max value
 
         with st.expander('More filters'):
+            
+            st.multiselect('Select month', list(months.keys()), key='selectedMonth')
+
+            timeIntervalOptions = ['All', 'Week', 'Month', 'Year', 'Week day', 'Day', 'Hour', 'Custom day']
+
+            if st.session_state['timeInterval'] != 'Custom day':
+                st.selectbox('Time interval', timeIntervalOptions, key='timeInterval')
+            else:
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.selectbox('Time interval', timeIntervalOptions, index=timeIntervalOptions.index("Custom day"), key='timeInterval')
+
+                with col2:
+                    st.number_input('Custom', value=10, step=1, min_value=1)  # set max value
+                    
             col1, col2, col3 = st.columns(3)
 
             with col1:
@@ -148,9 +147,11 @@ if st.session_state['authentication_status']:
 
             if 'selectedCompanies' in st.session_state and st.session_state['selectedCompanies']:
                 filteredTips = filteredTips[filteredTips['Company'].isin(st.session_state['selectedCompanies'])]
+            if 'selectedPartners' in st.session_state and st.session_state['selectedPartners']:
+                filteredTips = filteredTips[filteredTips['Partner'].isin(st.session_state['selectedPartners'])]
             if 'selectedMonth' in st.session_state and st.session_state['selectedMonth']:
                 month_indices = [months[month] for month in st.session_state['selectedMonth']]
-                filteredTips = filteredTips[filteredTips['month'].isin(month_indices)]
+                filteredTips = filteredTips[filteredTips['Month'].isin(month_indices)]
             if 'Status' in st.session_state and st.session_state['Status']:
                 filteredTips = filteredTips[filteredTips['Status'].isin(st.session_state['Status'])]
             if 'paymentProcessor' in st.session_state and st.session_state['paymentProcessor']:
@@ -160,7 +161,7 @@ if st.session_state['authentication_status']:
                     (filteredTips['Amount'] >= st.session_state['amountFilterMin']) &
                     (filteredTips['Amount'] <= st.session_state['amountFilterMax'])
                 ]
-
+            
             return filteredTips
         
         filteredTips = setFilters()        
@@ -168,63 +169,91 @@ if st.session_state['authentication_status']:
         def tipsGroupBy(tips, timeInterval):
             groupedTips = tips.groupby(timeInterval).agg({
                 'Amount': 'sum',
-                'companyPartner': 'count'
-            }).reset_index().rename(columns={'Amount': 'Sum of amount', 'companyPartner': 'Count'})
+                'uuid': 'count'  # Подсчет количества уникальных записей в каждой группе
+            }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'ggTips'})  # Переименуем колонку в 'Count'
 
             return groupedTips
         
-        if st.session_state['timeInterval'] == 'Hour':
-            groupedTips = tipsGroupBy(filteredTips, 'hour')
-        if st.session_state['timeInterval'] == 'Week day':
-            groupedTips = tipsGroupBy(filteredTips, 'weekday')
-        if st.session_state['timeInterval'] == 'Day':
-            groupedTips = tipsGroupBy(filteredTips, 'day')
-        if st.session_state['timeInterval'] == 'Week':
-            groupedTips = tipsGroupBy(filteredTips, 'weekNumber')
-        elif st.session_state['timeInterval'] == 'Month':
-            groupedTips = tipsGroupBy(filteredTips, 'month')
-        elif st.session_state['timeInterval'] == 'Year':
-            groupedTips = tipsGroupBy(filteredTips, 'year')  # TO OPTIMIZE THIS
-
+        if st.session_state['timeInterval'] and st.session_state['timeInterval'] != 'All':
+            filteredTips = tipsGroupBy(filteredTips, st.session_state['timeInterval'])
+    
         if st.button('Clear Filters'):
             for setting in defaultInputs.keys():
                 st.session_state[setting] = defaultInputs[setting]
             st.experimental_rerun()
 
         st.header('Chart')
+        
+        with st.expander('stats'):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.write('Sum: ', filteredTips['ggTips'].sum())
 
-        graph = px.bar(groupedTips, x=groupedTips.columns[0], y='Sum of amount',
-                                title='Count',
+            with col2:
+                st.write('Count: ', filteredTips['Count'].sum())
+            
+        st.selectbox('Aggretation', ['sum', 'count'], key='aggretation')
+        
+        if st.session_state['aggretation']=='sum':
+            y_axis = 'ggTips'
+        elif st.session_state['aggretation'] == 'count':
+            y_axis = 'Count'
+        
+        graph = px.bar(filteredTips, x=filteredTips.columns[0], y=y_axis,
+                                title=st.session_state['aggretation'],
                                 color_discrete_sequence=['green'],
                         )
         
         graph.update_traces(
             texttemplate='%{y:․0f}',
             textposition='outside',
-            hovertemplate='<b>Week Number:</b> %{x}<br><b>Sum of Amount:</b> %{y}<extra></extra>',
+            # hovertemplate='''<b>Week:  </b> %{Hour}<br>
+            #                  <b>Count: </b> <extra></extra><br><br>
+            #                  <b>Amount:</b> %{y}<extra></extra> ''',
             hoverlabel=dict(
-                bgcolor='black',
-                font_size=15
-                # font_family='Rockwell'
-            )
+                    bgcolor='#1f77b4',  # Цвет фона подсказки
+                    font_size=15,
+                    font_color='white'
+                ),
+            # customdata=filteredTips[['week_end', 'Tips Count']].values
         )
 
-        graph.update_layout({
-            'plot_bgcolor': 'rgba(0, 0, 0, 0)',
-            'paper_bgcolor': 'rgba(0, 0, 0, 0)',
-            'font': {'color': 'white'},  # Change font color to white
-            'width': 1200,  # Set the width
-            'height': 420,  # Set the height
-        })
+        graph.update_layout(
+            plot_bgcolor='rgba(0, 0, 0, 0)',  # Прозрачный фон
+            paper_bgcolor='rgba(0, 0, 0, 0)',
+            font=dict(color='white', size=12),  # Цвет и размер шрифта
+            xaxis=dict(
+                title='Week Start Date',
+                showgrid=True,
+                gridcolor='gray',
+                gridwidth=0.5
+            ),
+            yaxis=dict(
+                title='Sum of Tips',
+                showgrid=True,
+                gridcolor='gray',
+                gridwidth=0.5
+            ),
+            width=1200,
+            height=420,
+            margin=dict(l=40, r=40, t=40, b=40),
+            title=dict(x=0.5),  # Центрирование заголовка
+            coloraxis_showscale=False  # Скрыть цветовую шкалу
+        )
+
 
         click_event = plotly_events(graph)
 
         if click_event:
             week_num = click_event[0]['x']
-            filtered_data = tips[tips['weekNumber'] == week_num]
+            filtered_data = tips[tips['Week'] == week_num]
             st.write(f'Transactions for week {week_num}')
             # selectedColumns = ['Company', 'Partner', 'Date', 'Amount', 'PaymentProcessor', 'ggPayer']
             st.dataframe(filtered_data)
+            
+        st.dataframe(tips)
+        st.dataframe(ggTeammates)
                
     else:
         st.write("import data about ggTips product for analyze")

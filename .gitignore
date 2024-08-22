@@ -1,4 +1,5 @@
 ggTipsProjectNotes.txt
 ggTipsProjectDraft.py
-data\uploads
+data/uploads/*
+!data/uploads/.gitkeep
 ggTips Website

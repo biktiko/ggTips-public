@@ -1,6 +1,16 @@
 import pandas as pd
 import os
 
+def isExcelFile(file_path):
+    # Получаем расширение файла
+    _, file_extension = os.path.splitext(file_path)
+    
+    # Проверяем, является ли расширение файла CSV или Excel
+    if file_extension.lower() in ['.csv', '.xlsx']:
+        return True
+    else:
+        return False
+
 uploadFilesPath = 'data/uploads/'
 
 def replace_values(df):
@@ -37,7 +47,7 @@ def load_data():
 
     for file in os.listdir(uploadFilesPath):
         file_path = os.path.join(uploadFilesPath, file)
-        if os.path.isfile(file_path):
+        if isExcelFile(file_path):
             try:
                 newExcelFile = pd.ExcelFile(file_path)
                 allData.append(newExcelFile)
@@ -47,6 +57,7 @@ def load_data():
                 
     # Словарь для хранения DataFrame для каждого листа
     Tips = pd.DataFrame()
+    ggTeammates = pd.DataFrame()
     
     tablesKeyWords = {
         'Tips': ['uuid', 'Meta Data', 'Review comment', 'amount', 'paymentStateId', 'error_desc', 'remote_order_id', 'Payment processor', 'status']
@@ -59,14 +70,14 @@ def load_data():
         'Amount': ['amount'],
         'Payment processor': ['paymentprocessor', 'processor', 'payment_processor'],
         'Status': ['status', 'paymentstateid'],
-        'ggPayer': ['ggpayer'],
-        'ggPaye': ['ggpayee'],
-        'uuid': ['uuid']
+        'ggPayer': ['ggpayer', 'payer'],
+        'ggPaye': ['ggpayee', 'paye'],
+        'uuid': ['uuid', 'remote_order_id'],
     }
      
     for file in os.listdir(uploadFilesPath):
         file_path = os.path.join(uploadFilesPath, file)
-        if os.path.isfile(file_path):
+        if isExcelFile(file_path):
             newExcelFile = pd.ExcelFile(file_path)
             
             for sheet in newExcelFile.sheet_names:
@@ -104,6 +115,9 @@ def load_data():
                         # Проверка и объединение данных по uuid
                         if 'uuid' in df.columns:
                             df.set_index('uuid', inplace=True)
+                            
+                            df = df[~df.index.duplicated(keep='last')]
+
                             if not Tips.empty:
                                 Tips.set_index('uuid', inplace=True)
                                 Tips.update(df)
@@ -114,19 +128,23 @@ def load_data():
                                 Tips = pd.concat([Tips, df.reset_index()], ignore_index=True)
                         else:
                             print(f"'uuid' column not found in the sheet {sheet}")
-                    else:
-                        print(f"Нет подходящих столбцов для загрузки в таблице {sheet}")
+                    elif sheet == 'gg teammates':
+                        df_teammates = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
+                        ggTeammates['id'] = df_teammates['ID']
+                        ggTeammates['number'] = df_teammates['NUMBER']
 
     # Обработка временных меток и создание дополнительных столбцов
     if 'Date' in Tips.columns:
         Tips['Date'] = pd.to_datetime(Tips['Date'], errors='coerce')
         Tips = Tips[Tips['Date'].dt.year > 2023]
-        Tips['weekNumber'] = Tips['Date'].dt.isocalendar().week
-        Tips['hour'] = Tips['Date'].dt.hour
-        Tips['day'] = Tips['Date'].dt.day
-        Tips['month'] = Tips['Date'].dt.month
-        Tips['year'] = Tips['Date'].dt.year
-        Tips['weekday'] = Tips['Date'].dt.weekday
+        Tips['Week'] = Tips['Date'].dt.isocalendar().week
+        Tips['Hour'] = Tips['Date'].dt.hour
+        Tips['Day'] = Tips['Date'].dt.day
+        Tips['Month'] = Tips['Date'].dt.month
+        Tips['Year'] = Tips['Date'].dt.year
+        Tips['Weeday'] = Tips['Date'].dt.weekday
+        Tips['WeekStart'] = pd.to_datetime(Tips['Year'].astype(str) + Tips['Week'].astype(str) + '1', format='%Y%W%w')
+        Tips['WeekEnd'] = Tips['WeekStart'] + pd.Timedelta(days=6)
     
     if 'Company' in Tips.columns and 'Partner' in Tips.columns:
         Tips['Company'] = Tips['Company'].astype(str)
@@ -142,12 +160,14 @@ def load_data():
         'paymentProcessor': [],
         'Status': ['finished'] if not Tips.empty and 'Status' in Tips.columns and 'finished' in Tips['Status'].values else [],
         'selectedCompanies': [],
-        'selectedPartner': []
+        'selectedPartner': [],
+        'aggretation': 'count'
     }
 
     data = {
         'tips': Tips,
         'defaultInputs': defaultInputs,
+        'ggTeammates': ggTeammates
     }
   
     return data
