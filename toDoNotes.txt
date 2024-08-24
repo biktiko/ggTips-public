@@ -17,3 +17,5 @@ HELPERcompanyName, Adress, Start, End	Days, 	Past days,	Previous time, Working s
 6. հանդիպումների քարտեզ
 7. fix see import files details bug
 8. ggTeammate fix
+9. save filters to cache
+10. import data разобраться
