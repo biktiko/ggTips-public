@@ -25,9 +25,6 @@ def replace_values(df):
             '1': 'success',
             1: 'success',
             'failure': 'failed'
-        },
-        'Payment processor': {
-            # Добавьте здесь другие замены
         }
     }
     
@@ -62,7 +59,7 @@ def load_data():
     
     tablesKeyWords = {
         'Tips': ['uuid', 'Meta Data', 'Review comment', 'amount', 'paymentStateId', 'error_desc', 'remote_order_id', 'Payment processor', 'status'],
-        'Companies': ['helpercompanyname', 'adress', 'working status', 'coordinate', 'region', 'status']
+        'Companies': ['helpercompanyname', 'Adress', 'Working status', 'Coordinate', 'Region']
     }
     
     columnsKeyWords = {
@@ -70,11 +67,12 @@ def load_data():
         'Partner': ['partner', 'partner name', 'partner_name'],
         'Date': ['date', 'createdat', 'created_at'],
         'Amount': ['amount'],
-        'Payment processor': ['paymentprocessor', 'processor', 'payment_processor'],
+        'Payment processor': ['paymentprocessor', 'payment processor', 'processor', 'payment_processor'],
         'Status': ['status', 'paymentstateid'],
         'ggPayer': ['ggpayer', 'payer'],
         'ggPaye': ['ggpayee', 'paye'],
         'uuid': ['uuid', 'remote_order_id'],
+        'ggPay': ['ggpay']
     }
      
     for file in os.listdir(uploadFilesPath):
@@ -83,11 +81,15 @@ def load_data():
             newExcelFile = pd.ExcelFile(file_path)
 
             for sheet in newExcelFile.sheet_names:
+                
                 df_header = pd.read_excel(newExcelFile, sheet_name=sheet, nrows=0)
-
+                # if(sheet=='Companies'):
+                #     df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
+                #     companies = pd.concat([companies, df_companies])
                 # Проверка наличия хотя бы одного ключевого слова в заголовках столбцов для Tips
                 for table in tablesKeyWords.keys():
                     if any(keyword in df_header.columns for keyword in tablesKeyWords[table]):
+                    
                         if table=="Tips":
                             columns_to_load = []
                             for column in df_header.columns:
@@ -136,6 +138,7 @@ def load_data():
                                 print("Company sheet is ", sheet)
                                 df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
                                 companies = pd.concat([companies, df_companies])
+                                
 
                     # Обработка листа с данными о ggTeammates
                     elif sheet.lower() == 'gg teammates':  # Проверка имени листа без учета регистра
@@ -156,7 +159,7 @@ def load_data():
         Tips['Day'] = Tips['Date'].dt.day
         Tips['Month'] = Tips['Date'].dt.month
         Tips['Year'] = Tips['Date'].dt.year
-        Tips['Weeday'] = Tips['Date'].dt.weekday
+        Tips['Week day'] = Tips['Date'].dt.weekday
         Tips['WeekStart'] = pd.to_datetime(Tips['Year'].astype(str) + Tips['Week'].astype(str) + '1', format='%Y%W%w')
         Tips['WeekEnd'] = Tips['WeekStart'] + pd.Timedelta(days=6)
     
@@ -174,8 +177,7 @@ def load_data():
         'paymentProcessor': [],
         'Status': ['finished'] if not Tips.empty and 'Status' in Tips.columns and 'finished' in Tips['Status'].values else [],
         'selectedCompanies': [],
-        'selectedPartner': [],
-        'aggretation': 'count'
+        'selectedPartner': []
     }
 
     data = {

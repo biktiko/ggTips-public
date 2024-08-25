@@ -5,3 +5,5 @@ streamlit-plotly-events
 openpyxl
 streamlit_authenticator
 altair
+folium
+streamlit_folium

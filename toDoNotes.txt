@@ -1,21 +1,20 @@
-Ամբողջ դատան բերել 3-5 աղյուսակների
-1․ Transactions +
-2. Companies
-3. Partners
-4. Employees (?) ->
-5․ Կանխիկացումների (հետագայում)
-
-
 working email, avatar, partnerMessage, json_agg, Real? -> Partners
-HELPERcompanyName, Adress, Start, End	Days, 	Past days,	Previous time, Working status -> Company
 
-1. do options in ggTipsProject.py more dynamice
-2 filters move to ggTipData.py
+
 3 talbeKeyWords upgrade
-4 custom Day timeinterval fix
 5. reset button
 6. հանդիպումների քարտեզ
 7. fix see import files details bug
-8. ggTeammate fix
 9. save filters to cache
 10. import data разобраться
+11. terminal possible errors check with chat gpt
+12. comments to english
+14 sorting
+15 payment processor to fix
+16 new partners table
+17 companies name fix. example two beer academy. big, small letters question
+18 column width custom filter
+
+
+completed
+13. fix hours. sometimes +4. sometimes not
