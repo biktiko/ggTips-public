@@ -27,7 +27,8 @@ if st.session_state['authentication_status']:
     
     filteredTips = tips.copy()
     filteredCompanies = companies.copy()
-    filteredCompanies= filteredCompanies[filteredCompanies['Working status']]
+    if 'Working status' in filteredCompanies:
+        filteredCompanies= filteredCompanies[filteredCompanies['Working status']]
 
     for setting in defaultInputs.keys():
         if setting not in st.session_state:
