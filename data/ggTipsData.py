@@ -2,14 +2,8 @@ import pandas as pd
 import os
 
 def isExcelFile(file_path):
-    # Получаем расширение файла
     _, file_extension = os.path.splitext(file_path)
-    
-    # Проверяем, является ли расширение файла CSV или Excel
-    if file_extension.lower() in ['.csv', '.xlsx']:
-        return True
-    else:
-        return False
+    return file_extension.lower() in ['.csv', '.xlsx']
 
 uploadFilesPath = 'data/uploads/'
 
@@ -33,32 +27,19 @@ def replace_values(df):
             df[column] = df[column].replace(replace_dict)
     
     return df
-
 def load_data():
-    
     if not os.path.exists(uploadFilesPath):
         os.makedirs(uploadFilesPath)
 
     allData = []
     allSheets = []
-
-    for file in os.listdir(uploadFilesPath):
-        file_path = os.path.join(uploadFilesPath, file)
-        if isExcelFile(file_path):
-            try:
-                newExcelFile = pd.ExcelFile(file_path)
-                allData.append(newExcelFile)
-                allSheets.extend(newExcelFile.sheet_names)  # Добавляем имена листов в allSheets
-            except Exception as e:  # Ловим любое исключение
-                print(f'{file} is not an excel file: {e}')
-                
-    # Словарь для хранения DataFrame для каждого листа
+    
     Tips = pd.DataFrame()
     companies = pd.DataFrame()
     ggTeammates = pd.DataFrame()
     
     tablesKeyWords = {
-        'Tips': ['uuid', 'Meta Data', 'Review comment', 'amount', 'paymentStateId', 'error_desc', 'remote_order_id', 'Payment processor', 'status'],
+        'Tips': ['uuid', 'Meta Data', 'Review comment', 'paymentStateId', 'error_desc', 'remote_order_id', 'Payment processor', 'status'],
         'Companies': ['helpercompanyname', 'Adress', 'Working status', 'Coordinate', 'Region']
     }
     
@@ -74,36 +55,43 @@ def load_data():
         'uuid': ['uuid', 'remote_order_id'],
         'ggPay': ['ggpay']
     }
-     
+        
+    def ensure_columns_exist(df, columns):
+        for column in columns:
+            if column not in df.columns:
+                df[column] = pd.NA
+        return df
+
+    def update_df(existing_df, new_df):
+        for column in new_df.columns:
+            if column in existing_df.columns:
+                existing_df[column].fillna(new_df[column], inplace=True)
+            else:
+                existing_df[column] = new_df[column]
+        return existing_df
+
     for file in os.listdir(uploadFilesPath):
         file_path = os.path.join(uploadFilesPath, file)
         if isExcelFile(file_path):
             newExcelFile = pd.ExcelFile(file_path)
 
             for sheet in newExcelFile.sheet_names:
-                
                 df_header = pd.read_excel(newExcelFile, sheet_name=sheet, nrows=0)
-                # if(sheet=='Companies'):
-                #     df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
-                #     companies = pd.concat([companies, df_companies])
-                # Проверка наличия хотя бы одного ключевого слова в заголовках столбцов для Tips
+
                 for table in tablesKeyWords.keys():
                     if any(keyword in df_header.columns for keyword in tablesKeyWords[table]):
-                    
-                        if table=="Tips":
+                        if table == "Tips":
                             columns_to_load = []
                             for column in df_header.columns:
-                                if isinstance(column, str):
-                                    column_stripped = column.strip().lower()
-                                    for key, keywords in columnsKeyWords.items():
-                                        if column_stripped in keywords:
-                                            columns_to_load.append(column)
+                                column_stripped = column.lower()
+                                for key, keywords in columnsKeyWords.items():
+                                    if column_stripped in keywords:
+                                        columns_to_load.append(column)
 
                             if columns_to_load:
                                 df = pd.read_excel(newExcelFile, sheet_name=sheet, usecols=columns_to_load, engine='openpyxl')
                                 df = df.copy()
 
-                                # Переименование столбцов
                                 renamed_columns = {}
                                 for column in df.columns:
                                     column_stripped = column.strip().lower()
@@ -114,34 +102,30 @@ def load_data():
                                 df.rename(columns=renamed_columns, inplace=True)
                                 df = replace_values(df)
 
-                                # Обработка времени
                                 if 'Date' in df.columns:
                                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-                                # Проверка и объединение данных по uuid
+                                # Проверка наличия столбца 'uuid'
                                 if 'uuid' in df.columns:
                                     df.set_index('uuid', inplace=True)
-                                    
+
                                     df = df[~df.index.duplicated(keep='last')]
 
-                                    if not Tips.empty:
-                                        Tips.set_index('uuid', inplace=True)
+                                    if Tips.empty:
+                                        Tips = df.copy()
+                                    else:
+                                        Tips = ensure_columns_exist(Tips, df.columns)
                                         Tips.update(df)
                                         new_rows = df.loc[~df.index.isin(Tips.index)]
                                         Tips = pd.concat([Tips, new_rows], ignore_index=False)
                                         Tips.reset_index(inplace=True)
-                                    else:
-                                        Tips = pd.concat([Tips, df.reset_index()], ignore_index=True)
                                 else:
                                     print(f"'uuid' column not found in the sheet {sheet}")
-                        elif table=='Companies':
-                                print("Company sheet is ", sheet)
-                                df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
-                                companies = pd.concat([companies, df_companies])
-                                
+                        elif table == 'Companies':
+                            df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
+                            companies = pd.concat([companies, df_companies])
 
-                    # Обработка листа с данными о ggTeammates
-                    elif sheet.lower() == 'gg teammates':  # Проверка имени листа без учета регистра
+                    elif sheet.lower() == 'gg teammates':
                         df_teammates = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
 
                         if 'ID' in df_teammates.columns and 'NUMBER' in df_teammates.columns:
@@ -150,7 +134,6 @@ def load_data():
                         else:
                             print(f"'ID' or 'NUMBER' column not found in the sheet {sheet}")
 
-    # Обработка временных меток и создание дополнительных столбцов
     if 'Date' in Tips.columns:
         Tips['Date'] = pd.to_datetime(Tips['Date'], errors='coerce')
         Tips = Tips[Tips['Date'].dt.year > 2023]
@@ -186,5 +169,5 @@ def load_data():
         'defaultInputs': defaultInputs,
         'ggTeammates': ggTeammates
     }
-  
+
     return data

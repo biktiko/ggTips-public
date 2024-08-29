@@ -222,7 +222,17 @@ if st.session_state['authentication_status']:
             
             sumTips = groupedTips['ggTips'].sum()
             countTips = groupedTips['Count'].sum()
-            averageTip = round(sumTips / countTips)
+            connectionDays = filteredCompanies['Days'].max()
+            
+            if countTips !=0:
+                averageTip = round(sumTips / countTips)
+            else:
+                averageTip = 0
+            
+            if pd.notna(connectionDays) and connectionDays != 0:
+                oneDayTip = round(sumTips/connectionDays)
+            else:
+                oneDayTip = 0 
             
             with col1:
                 st.write('Sum: ', sumTips)
@@ -235,8 +245,6 @@ if st.session_state['authentication_status']:
                 
             col1, col2, col3 = st.columns(3)
             
-            connectionDays = filteredCompanies['Days'].max()
-            oneDayTip = round(sumTips/connectionDays)
             
             with col1:
                 st.write('Activ days: ', connectionDays)
