@@ -256,9 +256,7 @@ if st.session_state['authentication_status']:
         AllTipsTab, CompaniesTipsTab, TablesTab, MapTab = st.tabs(['Graph', 'Companies', 'Tables', 'map'])
         
         with AllTipsTab: 
-            
-            st.write(ggTeammates)
-            
+                        
             st.header("All Tips Overview")
             
             with st.container():

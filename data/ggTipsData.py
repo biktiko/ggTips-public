@@ -30,9 +30,6 @@ def replace_values(df):
 def load_data():
     if not os.path.exists(uploadFilesPath):
         os.makedirs(uploadFilesPath)
-
-    allData = []
-    allSheets = []
     
     Tips = pd.DataFrame()
     companies = pd.DataFrame()
