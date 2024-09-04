@@ -88,11 +88,11 @@ if st.session_state['authentication_status']:
         options = {
             'companiesOptions': list(tips['Company'].unique()) if 'Company' in tips else ['All'],
             'partnersOptions': list(tips['Partner'].unique()) if 'Partner' in tips else ['All'],
-            'paymentProcessorOptions': list(tips['Payment processor'].unique()) if 'Payment processor' in tips else ['All'],
+            'paymentProcessorOptions': list(tips['Payment processor'].dropna().unique()) if 'Payment processor' in tips else ['All'],
             'statusOptions': list(tips['Status'].unique()) if 'Status' in tips else ['All'],
             'ggPayeersOptions': ['All', 'Without gg teammates', 'Only gg teammates']  # Исправление здесь
         }
-
+        
         # Настройки боковой панели
         with st.sidebar:
             st.header('Settings')
@@ -251,13 +251,25 @@ if st.session_state['authentication_status']:
                 
             with col2:
                 st.write('Daily tips amount: ', oneDayTip)
-                
-                
+                             
         # Создание графика с помощью Altair
         AllTipsTab, CompaniesTipsTab, TablesTab, MapTab = st.tabs(['Graph', 'Companies', 'Tables', 'map'])
         
         with AllTipsTab: 
+            
+            st.write(ggTeammates)
+            
+            st.header("All Tips Overview")
+            
+            with st.container():
+                sort_column = st.selectbox("Select column for sorting", ["ggTips", "Count"], key="sort_col_all")
+                sort_direction = st.selectbox("Select sort direction", ["Ascending", "Descending"], key="sort_dir_all")
 
+                if sort_direction == "Ascending":
+                    groupedTips = groupedTips.sort_values(by=sort_column, ascending=True)
+                else:
+                    groupedTips = groupedTips.sort_values(by=sort_column, ascending=False)
+            
             if sum_type != 'None' or count_type != 'None':
                 layers = []
                 x_axis = alt.X(f'{time_interval}:T' if time_interval in ['WeekStart', 'WeekEnd', 'Date'] else time_interval, 
@@ -310,45 +322,54 @@ if st.session_state['authentication_status']:
                 
             with CompaniesTipsTab:
                 st.write('!NOT READY!')
+
+                # Группируем данные по компаниям
+                companiesGroupedTips = filteredTips.groupby('Company').agg({
+                    'Amount': 'sum',
+                    'uuid': 'count',
+                    'WeekStart': 'max',
+                    'WeekEnd': 'max'
+                }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'ggTips'})
+
                 if sum_type != 'None' or count_type != 'None':
                     layers = []
                     x_axis = alt.X('Company:N', axis=alt.Axis(title='Company Name'))
 
                     if sum_type != 'None':
                         if sum_type == 'Column':
-                            sum_layer = alt.Chart(filteredTips).mark_bar(size=20, color=sum_color)
+                            sum_layer = alt.Chart(companiesGroupedTips).mark_bar(size=20, color=sum_color)
                         elif sum_type == 'Line':
-                            sum_layer = alt.Chart(filteredTips).mark_line(color=sum_color)
+                            sum_layer = alt.Chart(companiesGroupedTips).mark_line(color=sum_color)
                         elif sum_type == 'Area':
-                            sum_layer = alt.Chart(filteredTips).mark_area(color=sum_color)
+                            sum_layer = alt.Chart(companiesGroupedTips).mark_area(color=sum_color)
 
                         sum_layer = sum_layer.encode(
                             x=x_axis,
-                            y=alt.Y('Amount:Q', axis=alt.Axis(title='Sum of Tips')),  # Явно указываем тип данных Q (Quantitative)
-                            tooltip=[alt.Tooltip('Period:N'), alt.Tooltip('ggTips:Q'), alt.Tooltip('Count:Q')]  # Указываем типы данных для всех полей
+                            y=alt.Y('ggTips:Q', axis=alt.Axis(title='Sum of Tips')),  # Используем ggTips вместо Amount
+                            tooltip=[alt.Tooltip('Company:N'), alt.Tooltip('ggTips:Q'), alt.Tooltip('Count:Q')]  # Добавляем tooltip
                         ).properties(
                             width=chart_width,
                             height=chart_height
                         )
-                        layers.append(sum_layer)  # Не забываем добавить слой в список layers
+                        layers.append(sum_layer)
 
                     if count_type != 'None':
                         if count_type == 'Column':
-                            count_layer = alt.Chart(filteredTips).mark_bar(size=20, color=count_color)
+                            count_layer = alt.Chart(companiesGroupedTips).mark_bar(size=20, color=count_color)
                         elif count_type == 'Line':
-                            count_layer = alt.Chart(filteredTips).mark_line(color=count_color)
+                            count_layer = alt.Chart(companiesGroupedTips).mark_line(color=count_color)
                         elif count_type == 'Area':
-                            count_layer = alt.Chart(filteredTips).mark_area(color=count_color)
+                            count_layer = alt.Chart(companiesGroupedTips).mark_area(color=count_color)
 
                         count_layer = count_layer.encode(
                             x=x_axis,
                             y=alt.Y('Count:Q', axis=alt.Axis(title='Count of Transactions', titleFontSize=14)),
-                            tooltip=[alt.Tooltip('Period:N'), alt.Tooltip('ggTips:Q'), alt.Tooltip('Count:Q')]  # Указываем типы данных для всех полей
+                            tooltip=[alt.Tooltip('Company:N'), alt.Tooltip('ggTips:Q'), alt.Tooltip('Count:Q')]
                         ).properties(
                             width=chart_width,
                             height=chart_height
                         )
-                        layers.append(count_layer)  # Не забываем добавить слой в список layers
+                        layers.append(count_layer)
 
                     # Комбинирование графиков
                     chart = alt.layer(*layers).resolve_scale(
@@ -358,7 +379,6 @@ if st.session_state['authentication_status']:
                         titleColor='white'
                     )
                     st.altair_chart(chart, use_container_width=True)
-
 
         with TablesTab:
             st.write('Companies')
@@ -400,7 +420,6 @@ if st.session_state['authentication_status']:
             st.title('Map of Company Locations')
             folium_static(m)           
         
-
     else:
         st.write("import data about ggTips product for analyze")
 

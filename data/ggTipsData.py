@@ -125,7 +125,8 @@ def load_data():
                             df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
                             companies = pd.concat([companies, df_companies])
 
-                    elif sheet.lower() == 'gg teammates':
+                    elif sheet.lower() == 'gg teammates' or sheet.lower() == 'gg_teammates':
+                        print('We in ggTeammates sheet')
                         df_teammates = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
 
                         if 'ID' in df_teammates.columns and 'NUMBER' in df_teammates.columns:
@@ -133,6 +134,9 @@ def load_data():
                             ggTeammates['number'] = df_teammates['NUMBER']
                         else:
                             print(f"'ID' or 'NUMBER' column not found in the sheet {sheet}")
+                    else:
+                        print('Not found ggTeammates sheet')
+
 
     if 'Date' in Tips.columns:
         Tips['Date'] = pd.to_datetime(Tips['Date'], errors='coerce')
