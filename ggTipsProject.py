@@ -111,7 +111,7 @@ if st.session_state['authentication_status']:
                     filteredTips = filteredTips[(filteredTips['Date'] >= pd.to_datetime(start_date)) & (filteredTips['Date'] <= pd.to_datetime(end_date))]
 
                 col1, col2 = st.columns(2)
-
+                
                 with col1:
                     st.selectbox('ggPayers', options['ggPayeersOptions'], key='ggPayeers')
 
@@ -260,91 +260,50 @@ if st.session_state['authentication_status']:
             st.header("All Tips Overview")
             
             with st.container():
-                sort_column = st.selectbox("Select column for sorting", ["ggTips", "Count"], key="sort_col_all")
-                sort_direction = st.selectbox("Select sort direction", ["Ascending", "Descending"], key="sort_dir_all")
+                with st.expander('Sorting'):
+                    sort_column = st.selectbox("Select column for sorting", ["ggTips", "Count", "Time"], key="sort_col_all")
+                    sort_direction = st.selectbox("Select sort direction", ["Descending", 'Ascending'], key="sort_dir_all")
 
-                if sort_direction == "Ascending":
-                    groupedTips = groupedTips.sort_values(by=sort_column, ascending=True)
-                else:
-                    groupedTips = groupedTips.sort_values(by=sort_column, ascending=False)
-            
-            if sum_type != 'None' or count_type != 'None':
-                layers = []
-                x_axis = alt.X(f'{time_interval}:T' if time_interval in ['WeekStart', 'WeekEnd', 'Date'] else time_interval, 
-                            axis=alt.Axis(title=f'{time_interval}', titleFontSize=14))
+                    # Если выбрано сортировать по времени, выполняем сортировку по нужному интервалу времени
+                    if sort_column == "Time":
+                        # Преобразуем колонку времени в datetime, если это возможно
+                        if time_interval in ['Week', 'Month', 'Year']:
+                            groupedTips[time_interval] = pd.to_datetime(groupedTips['WeekStart'])  # Для недель, месяцев и годов
+                        else:
+                            groupedTips[time_interval] = pd.to_datetime(groupedTips[time_interval])  # Для дней или кастомных интервалов
 
-                if sum_type != 'None':
-                    if sum_type == 'Column':
-                        sum_layer = alt.Chart(groupedTips).mark_bar(size=20, color=sum_color)
-                    elif sum_type == 'Line':
-                        sum_layer = alt.Chart(groupedTips).mark_line(color=sum_color)
-                    elif sum_type == 'Area':
-                        sum_layer = alt.Chart(groupedTips).mark_area(color=sum_color)
-
-                    sum_layer = sum_layer.encode(
-                        x=x_axis,
-                        y=alt.Y('ggTips:Q', axis=alt.Axis(title='Sum of Tips')),
-                        tooltip=['Period', 'ggTips', 'Count']
-                    ).properties(
-                        width=chart_width,
-                        height=chart_height
-                    )
-                    layers.append(sum_layer)
-
-                if count_type != 'None':
-                    if count_type == 'Column':
-                        count_layer = alt.Chart(groupedTips).mark_bar(size=20, color=count_color)
-                    elif count_type == 'Line':
-                        count_layer = alt.Chart(groupedTips).mark_line(color=count_color)
-                    elif count_type == 'Area':
-                        count_layer = alt.Chart(groupedTips).mark_area(color=count_color)
-
-                    count_layer = count_layer.encode(
-                        x=x_axis,
-                        y=alt.Y('Count:Q', axis=alt.Axis(title='Count of Transactions', titleFontSize=14)),
-                        tooltip=['Period', 'ggTips', 'Count']
-                    ).properties(
-                        width=chart_width,
-                        height=chart_height
-                    )
-                    layers.append(count_layer)
-
-                # Комбинирование графиков
-                chart = alt.layer(*layers).resolve_scale(
-                    y='independent'
-                ).configure_axis(
-                    labelColor='white',
-                    titleColor='white'
-                )
-                st.altair_chart(chart, use_container_width=True)
+                        # Сортируем данные по времени
+                        groupedTips = groupedTips.sort_values(by=time_interval, ascending=(sort_direction == 'Ascending'))
+                    else:
+                        # Если сортировка по другим колонкам (например, ggTips или Count)
+                        groupedTips = groupedTips.sort_values(by=sort_column, ascending=(sort_direction == 'Ascending'))
+                # st.write(groupedTips)
                 
-            with CompaniesTipsTab:
-                st.write('!NOT READY!')
-
-                # Группируем данные по компаниям
-                companiesGroupedTips = filteredTips.groupby('Company').agg({
-                    'Amount': 'sum',
-                    'uuid': 'count',
-                    'WeekStart': 'max',
-                    'WeekEnd': 'max'
-                }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'ggTips'})
-
                 if sum_type != 'None' or count_type != 'None':
                     layers = []
-                    x_axis = alt.X('Company:N', axis=alt.Axis(title='Company Name'))
+
+                    x_axis = alt.X(f'{time_interval}:O',  # Указываем категориальную ось для строк или чисел (O), либо T для дат
+                        axis=alt.Axis(title=f'{time_interval}', titleFontSize=14),
+                        sort=groupedTips[time_interval].tolist())
 
                     if sum_type != 'None':
                         if sum_type == 'Column':
-                            sum_layer = alt.Chart(companiesGroupedTips).mark_bar(size=20, color=sum_color)
+                            # Добавляем границу (stroke) и ширину границы (strokeWidth) для столбцов
+                            sum_layer = alt.Chart(groupedTips).mark_bar(
+                                size=20,  # Размер столбца
+                                color=sum_color,  # Основной цвет столбца
+                                stroke='white',  # Граница столбца
+                                strokeWidth=1  # Толщина границы
+                            )
                         elif sum_type == 'Line':
-                            sum_layer = alt.Chart(companiesGroupedTips).mark_line(color=sum_color)
+                            sum_layer = alt.Chart(groupedTips).mark_line(color=sum_color)
                         elif sum_type == 'Area':
-                            sum_layer = alt.Chart(companiesGroupedTips).mark_area(color=sum_color)
+                            sum_layer = alt.Chart(groupedTips).mark_area(color=sum_color)
 
                         sum_layer = sum_layer.encode(
                             x=x_axis,
-                            y=alt.Y('ggTips:Q', axis=alt.Axis(title='Sum of Tips')),  # Используем ggTips вместо Amount
-                            tooltip=[alt.Tooltip('Company:N'), alt.Tooltip('ggTips:Q'), alt.Tooltip('Count:Q')]  # Добавляем tooltip
+                            y=alt.Y('ggTips:Q', axis=alt.Axis(title='Sum of Tips')),
+                            tooltip=['Period', 'ggTips', 'Count']
                         ).properties(
                             width=chart_width,
                             height=chart_height
@@ -353,7 +312,102 @@ if st.session_state['authentication_status']:
 
                     if count_type != 'None':
                         if count_type == 'Column':
-                            count_layer = alt.Chart(companiesGroupedTips).mark_bar(size=20, color=count_color)
+                            # Аналогично добавляем границу для второго слоя
+                            count_layer = alt.Chart(groupedTips).mark_bar(
+                                size=20,  # Размер столбца
+                                color=count_color,  # Основной цвет столбца
+                                stroke='white',  # Граница столбца
+                                strokeWidth=2  # Толщина границы
+                            )
+                        elif count_type == 'Line':
+                            count_layer = alt.Chart(groupedTips).mark_line(color=count_color)
+                        elif count_type == 'Area':
+                            count_layer = alt.Chart(groupedTips).mark_area(color=count_color)
+
+                        count_layer = count_layer.encode(
+                            x=x_axis,
+                            y=alt.Y('Count:Q', axis=alt.Axis(title='Count of Transactions', titleFontSize=14)),
+                            tooltip=['Period', 'ggTips', 'Count']
+                        ).properties(
+                            width=chart_width,
+                            height=chart_height
+                        )
+                        layers.append(count_layer)
+
+                    # Комбинирование графиков
+                    chart = alt.layer(*layers).resolve_scale(
+                        y='independent'
+                    ).configure_axis(
+                        labelColor='white',
+                        titleColor='white'
+                    )
+                    st.altair_chart(chart, use_container_width=True)
+            with CompaniesTipsTab:
+                
+                companiesGroupedTips = filteredTips.groupby('Company').agg({
+                    'Amount': 'sum',
+                    'uuid': 'count',
+                    'WeekStart': 'max',
+                    'WeekEnd': 'max',
+                }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'ggTips'})
+
+                st.header("Companies Tips Overview")
+
+                # Выбор колонок для сортировки и направления
+                with st.container():
+                    
+                    with st.expander('Sorting'):
+                        sort_column_companies = st.selectbox("Select column for sorting", ["ggTips", "Count"], key="sort_col_companies")
+                        sort_direction_companies = st.selectbox("Select sort direction", ["Ascending", "Descending"], key="sort_dir_companies")
+
+                        if sort_direction_companies == "Ascending":
+                            companiesGroupedTips = companiesGroupedTips.sort_values(by=sort_column_companies, ascending=True)
+                        else:
+                            companiesGroupedTips = companiesGroupedTips.sort_values(by=sort_column_companies, ascending=False)
+                            
+
+                # if sort_column == "Date":
+                #     groupedTips['Week'] = pd.to_datetime(groupedTips['Date'])
+
+                st.write(companiesGroupedTips)
+                    
+                if sum_type != 'None' or count_type != 'None':
+                    layers = []
+                    
+                    # Ось X для компаний (категориальная)
+                    x_axis = alt.X('Company:N', axis=alt.Axis(title='Company Name'), sort=companiesGroupedTips['Company'].tolist())
+
+                    if sum_type != 'None':
+                        if sum_type == 'Column':
+                            sum_layer = alt.Chart(companiesGroupedTips).mark_bar(
+                                size=10,  # Уменьшаем размер столбцов для увеличения расстояния между ними
+                                color=sum_color,
+                                stroke='white',  # Добавляем белую границу вокруг каждого столбца
+                                strokeWidth=1  # Толщина границы
+                            )
+                        elif sum_type == 'Line':
+                            sum_layer = alt.Chart(companiesGroupedTips).mark_line(color=sum_color)
+                        elif sum_type == 'Area':
+                            sum_layer = alt.Chart(companiesGroupedTips).mark_area(color=sum_color)
+
+                        sum_layer = sum_layer.encode(
+                            x=x_axis,
+                            y=alt.Y('ggTips:Q', axis=alt.Axis(title='Sum of Tips')),
+                            tooltip=['Company', 'ggTips', 'Count']
+                        ).properties(
+                            width=chart_width,
+                            height=chart_height
+                        )
+                        layers.append(sum_layer)
+
+                    if count_type != 'None':
+                        if count_type == 'Column':
+                            count_layer = alt.Chart(companiesGroupedTips).mark_bar(
+                                size=10,  # Аналогично уменьшаем размер столбцов для второго слоя
+                                color=count_color,
+                                stroke='white',  # Добавляем белую границу
+                                strokeWidth=1
+                            )
                         elif count_type == 'Line':
                             count_layer = alt.Chart(companiesGroupedTips).mark_line(color=count_color)
                         elif count_type == 'Area':
@@ -362,7 +416,7 @@ if st.session_state['authentication_status']:
                         count_layer = count_layer.encode(
                             x=x_axis,
                             y=alt.Y('Count:Q', axis=alt.Axis(title='Count of Transactions', titleFontSize=14)),
-                            tooltip=[alt.Tooltip('Company:N'), alt.Tooltip('ggTips:Q'), alt.Tooltip('Count:Q')]
+                            tooltip=['Company', 'ggTips', 'Count']
                         ).properties(
                             width=chart_width,
                             height=chart_height
