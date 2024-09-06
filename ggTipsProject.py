@@ -208,7 +208,7 @@ if st.session_state['authentication_status']:
             'uuid': 'count',  
             'WeekStart': 'max',
             'WeekEnd': 'max'
-        }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'ggTips'})
+        }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
 
         if time_interval not in ['Week', 'Month', 'Year']:
             groupedTips['Period'] = groupedTips[time_interval].astype(str)
@@ -220,7 +220,7 @@ if st.session_state['authentication_status']:
         with st.expander('stats'):
             col1, col2, col3 = st.columns(3)
             
-            sumTips = groupedTips['ggTips'].sum()
+            sumTips = groupedTips['Amount'].sum()
             countTips = groupedTips['Count'].sum()
             connectionDays = filteredCompanies['Days'].max()
             
@@ -253,7 +253,7 @@ if st.session_state['authentication_status']:
                 st.write('Daily tips amount: ', oneDayTip)
                              
         # Создание графика с помощью Altair
-        AllTipsTab, CompaniesTipsTab, TablesTab, MapTab = st.tabs(['Graph', 'Companies', 'Tables', 'map'])
+        AllTipsTab, CompaniesTipsTab, CompanyConnectionsTab, TablesTab, MapTab = st.tabs(['Graph', 'Companies', 'Company connections', 'Tables', 'map'])
         
         with AllTipsTab: 
                         
@@ -261,7 +261,7 @@ if st.session_state['authentication_status']:
             
             with st.container():
                 with st.expander('Sorting'):
-                    sort_column = st.selectbox("Select column for sorting", ["ggTips", "Count", "Time"], key="sort_col_all")
+                    sort_column = st.selectbox("Select column for sorting", [ "Time", "Amount", "Count"], key="sort_col_all")
                     sort_direction = st.selectbox("Select sort direction", ["Descending", 'Ascending'], key="sort_dir_all")
 
                     # Если выбрано сортировать по времени, выполняем сортировку по нужному интервалу времени
@@ -274,26 +274,27 @@ if st.session_state['authentication_status']:
 
                         # Сортируем данные по времени
                         groupedTips = groupedTips.sort_values(by=time_interval, ascending=(sort_direction == 'Ascending'))
+                        x_axis_type = 'T'  # Тип данных для оси x - временной
                     else:
                         # Если сортировка по другим колонкам (например, ggTips или Count)
                         groupedTips = groupedTips.sort_values(by=sort_column, ascending=(sort_direction == 'Ascending'))
-                # st.write(groupedTips)
+                        x_axis_type = 'O'  # Тип данных для оси x - категориальный (номинальный)
                 
+                # Построение графика
                 if sum_type != 'None' or count_type != 'None':
                     layers = []
 
-                    x_axis = alt.X(f'{time_interval}:O',  # Указываем категориальную ось для строк или чисел (O), либо T для дат
+                    x_axis = alt.X(f'{time_interval}:{x_axis_type}',  # Указываем тип оси динамически: T для времени, O для других колонок
                         axis=alt.Axis(title=f'{time_interval}', titleFontSize=14),
                         sort=groupedTips[time_interval].tolist())
 
                     if sum_type != 'None':
                         if sum_type == 'Column':
-                            # Добавляем границу (stroke) и ширину границы (strokeWidth) для столбцов
                             sum_layer = alt.Chart(groupedTips).mark_bar(
-                                size=20,  # Размер столбца
-                                color=sum_color,  # Основной цвет столбца
-                                stroke='white',  # Граница столбца
-                                strokeWidth=1  # Толщина границы
+                                size=20,
+                                color=sum_color,
+                                stroke='white',
+                                strokeWidth=1
                             )
                         elif sum_type == 'Line':
                             sum_layer = alt.Chart(groupedTips).mark_line(color=sum_color)
@@ -302,8 +303,8 @@ if st.session_state['authentication_status']:
 
                         sum_layer = sum_layer.encode(
                             x=x_axis,
-                            y=alt.Y('ggTips:Q', axis=alt.Axis(title='Sum of Tips')),
-                            tooltip=['Period', 'ggTips', 'Count']
+                            y=alt.Y('Amount:Q', axis=alt.Axis(title='Sum of Tips')),
+                            tooltip=['Period', 'Amount', 'Count']
                         ).properties(
                             width=chart_width,
                             height=chart_height
@@ -312,12 +313,11 @@ if st.session_state['authentication_status']:
 
                     if count_type != 'None':
                         if count_type == 'Column':
-                            # Аналогично добавляем границу для второго слоя
                             count_layer = alt.Chart(groupedTips).mark_bar(
-                                size=20,  # Размер столбца
-                                color=count_color,  # Основной цвет столбца
-                                stroke='white',  # Граница столбца
-                                strokeWidth=2  # Толщина границы
+                                size=20,
+                                color=count_color,
+                                stroke='white',
+                                strokeWidth=2
                             )
                         elif count_type == 'Line':
                             count_layer = alt.Chart(groupedTips).mark_line(color=count_color)
@@ -327,7 +327,7 @@ if st.session_state['authentication_status']:
                         count_layer = count_layer.encode(
                             x=x_axis,
                             y=alt.Y('Count:Q', axis=alt.Axis(title='Count of Transactions', titleFontSize=14)),
-                            tooltip=['Period', 'ggTips', 'Count']
+                            tooltip=['Period', 'Amount', 'Count']
                         ).properties(
                             width=chart_width,
                             height=chart_height
@@ -349,7 +349,7 @@ if st.session_state['authentication_status']:
                     'uuid': 'count',
                     'WeekStart': 'max',
                     'WeekEnd': 'max',
-                }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'ggTips'})
+                }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
 
                 st.header("Companies Tips Overview")
 
@@ -357,19 +357,14 @@ if st.session_state['authentication_status']:
                 with st.container():
                     
                     with st.expander('Sorting'):
-                        sort_column_companies = st.selectbox("Select column for sorting", ["ggTips", "Count"], key="sort_col_companies")
+                        sort_column_companies = st.selectbox("Select column for sorting", ["Amount", "Count"], key="sort_col_companies")
                         sort_direction_companies = st.selectbox("Select sort direction", ["Ascending", "Descending"], key="sort_dir_companies")
 
                         if sort_direction_companies == "Ascending":
                             companiesGroupedTips = companiesGroupedTips.sort_values(by=sort_column_companies, ascending=True)
                         else:
                             companiesGroupedTips = companiesGroupedTips.sort_values(by=sort_column_companies, ascending=False)
-                            
-
-                # if sort_column == "Date":
-                #     groupedTips['Week'] = pd.to_datetime(groupedTips['Date'])
-
-                st.write(companiesGroupedTips)
+                        
                     
                 if sum_type != 'None' or count_type != 'None':
                     layers = []
@@ -392,8 +387,8 @@ if st.session_state['authentication_status']:
 
                         sum_layer = sum_layer.encode(
                             x=x_axis,
-                            y=alt.Y('ggTips:Q', axis=alt.Axis(title='Sum of Tips')),
-                            tooltip=['Company', 'ggTips', 'Count']
+                            y=alt.Y('Amount:Q', axis=alt.Axis(title='Sum of Tips')),
+                            tooltip=['Company', 'Amount', 'Count']
                         ).properties(
                             width=chart_width,
                             height=chart_height
@@ -416,7 +411,7 @@ if st.session_state['authentication_status']:
                         count_layer = count_layer.encode(
                             x=x_axis,
                             y=alt.Y('Count:Q', axis=alt.Axis(title='Count of Transactions', titleFontSize=14)),
-                            tooltip=['Company', 'ggTips', 'Count']
+                            tooltip=['Company', 'Amount', 'Count']
                         ).properties(
                             width=chart_width,
                             height=chart_height
@@ -431,6 +426,113 @@ if st.session_state['authentication_status']:
                         titleColor='white'
                     )
                     st.altair_chart(chart, use_container_width=True)
+                    
+        with CompanyConnectionsTab:
+    # Применяем фильтр по дате (выбранный пользователем)
+            if not date_range:
+                start_date = pd.to_datetime('2024-01-01')
+                end_date = pd.to_datetime('today')
+
+            # Преобразуем колонки Start и End в формат datetime
+            companies['Start'] = pd.to_datetime(companies['Start'])
+            companies['End'] = pd.to_datetime(companies['End'])
+
+            # Генерируем диапазон дат с учетом выбранного фильтра
+            date_range = pd.date_range(start=start_date, end=end_date)
+
+            # Подсчет активных бренчей и уникальных компаний на каждую дату в диапазоне
+            active_companies_per_day = []
+
+            for date in date_range:
+                # Подсчет активных бренчей
+                active_branches = companies[(companies['Start'].notna()) & 
+                                            ((companies['End'].isna()) | (companies['End'] >= date)) & 
+                                            (companies['Start'] <= date)]
+                
+                active_branches_count = active_branches.shape[0]
+                
+                # Подсчет активных уникальных компаний
+                unique_active_companies_count = active_branches['HELPERcompanyName'].nunique()
+                
+                active_companies_per_day.append({
+                    'Date': date, 
+                    'Active Branches': active_branches_count, 
+                    'Active Companies': unique_active_companies_count
+                })
+
+            # Преобразуем результат в DataFrame
+            active_companies_df = pd.DataFrame(active_companies_per_day)
+
+            # Рассчитываем изменения по дням (разница между текущим и предыдущим днем)
+            active_companies_df['Branches Change'] = active_companies_df['Active Branches'].diff().fillna(0)
+            active_companies_df['Companies Change'] = active_companies_df['Active Companies'].diff().fillna(0)
+
+            # Применяем фильтр по timeInterval (группировка данных)
+            if st.session_state['timeInterval'] == 'Week':
+                active_companies_df['Date'] = active_companies_df['Date'].dt.to_period('W').apply(lambda r: r.start_time)
+            elif st.session_state['timeInterval'] == 'Month':
+                active_companies_df['Date'] = active_companies_df['Date'].dt.to_period('M').apply(lambda r: r.start_time)
+            elif st.session_state['timeInterval'] == 'Year':
+                active_companies_df['Date'] = active_companies_df['Date'].dt.to_period('Y').apply(lambda r: r.start_time)
+            elif st.session_state['timeInterval'] == 'Day':
+                active_companies_df['Date'] = active_companies_df['Date'].dt.to_period('D').apply(lambda r: r.start_time)
+            elif st.session_state['timeInterval'] == 'Custom day':
+                custom_interval = st.session_state.get('customInterval', 10)
+                active_companies_df['Date'] = active_companies_df['Date'] - pd.to_timedelta(active_companies_df['Date'].dt.dayofyear % custom_interval, unit='D')
+
+            # Группируем данные по выбранному timeInterval
+            grouped_data = active_companies_df.groupby('Date').agg({
+                'Active Branches': 'max',
+                'Active Companies': 'max',
+                'Branches Change': 'sum',
+                'Companies Change': 'sum'
+            }).reset_index()
+
+            # Линейный график для отображения активных бренчей и компаний
+            line_chart = alt.Chart(grouped_data).mark_line(color='blue').encode(
+                x=alt.X('Date:T', title='Date'),
+                y=alt.Y('Active Branches:Q', title='Active Branches/Companies'),
+                tooltip=['Date:T', 'Active Branches:Q']
+            )
+
+            companies_line_chart = alt.Chart(grouped_data).mark_line(color='red').encode(
+                x=alt.X('Date:T', title='Date'),
+                y=alt.Y('Active Companies:Q', title='Active Branches/Companies'),
+                tooltip=['Date:T', 'Active Companies:Q']
+            )
+
+            combined_line_chart = alt.layer(line_chart, companies_line_chart).configure_axis(
+                labelColor='white',
+                titleColor='white'
+            )
+
+            st.altair_chart(combined_line_chart, use_container_width=True)
+
+            # Столбчатый график для отображения изменений
+            bar_chart_branches = alt.Chart(grouped_data).mark_bar(color='blue').encode(
+                x=alt.X('Date:T', title='Date'),
+                y=alt.Y('Branches Change:Q', title='Daily Change'),
+                tooltip=['Date:T', 'Branches Change:Q']
+            ).properties(
+                width=800,
+                height=200
+            )
+
+            bar_chart_companies = alt.Chart(grouped_data).mark_bar(color='red').encode(
+                x=alt.X('Date:T', title='Date'),
+                y=alt.Y('Companies Change:Q', title='Daily Change'),
+                tooltip=['Date:T', 'Companies Change:Q']
+            ).properties(
+                width=800,
+                height=200
+            )
+
+            combined_bar_chart = alt.layer(bar_chart_branches, bar_chart_companies).configure_axis(
+                labelColor='white',
+                titleColor='white'
+            )
+
+            st.altair_chart(combined_bar_chart, use_container_width=True)
 
         with TablesTab:
             st.write('Companies')
