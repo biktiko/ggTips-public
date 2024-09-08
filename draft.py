@@ -1,7 +1,76 @@
-def load_data():
-    # ... предыдущий код ...
+import pandas as pd
+import os
 
-    # Загрузка файлов и обработка листов
+def isExcelFile(file_path):
+    _, file_extension = os.path.splitext(file_path)
+    return file_extension.lower() in ['.csv', '.xlsx']
+
+uploadFilesPath = 'data/uploads/'
+
+def replace_values(df):
+    replacements = {
+        'Status': {
+            'transferred': 'finished',
+            'fail': 'failed',
+            '2' : 'finished',
+            2: 'finished',
+            '3': 'failed',
+            3: 'failed',
+            '1': 'success',
+            1: 'success',
+            'failure': 'failed'
+        }
+    }
+    
+    for column, replace_dict in replacements.items():
+        if column in df.columns:
+            df[column] = df[column].replace(replace_dict)
+    
+    return df
+
+def load_data():
+    if not os.path.exists(uploadFilesPath):
+        os.makedirs(uploadFilesPath)
+
+    allData = []
+    allSheets = []
+    
+    Tips = pd.DataFrame()
+    companies = pd.DataFrame()
+    ggTeammates = pd.DataFrame()
+    
+    tablesKeyWords = {
+        'Tips': ['uuid', 'Meta Data', 'Review comment', 'paymentStateId', 'error_desc', 'remote_order_id', 'Payment processor', 'status'],
+        'Companies': ['helpercompanyname', 'Adress', 'Working status', 'Coordinate', 'Region']
+    }
+    
+    columnsKeyWords = {
+        'Company': ['company', 'company name', 'company_name'],
+        'Partner': ['partner', 'partner name', 'partner_name'],
+        'Date': ['date', 'createdat', 'created_at'],
+        'Amount': ['amount'],
+        'Payment processor': ['paymentprocessor', 'payment processor', 'processor', 'payment_processor'],
+        'Status': ['status', 'paymentstateid'],
+        'ggPayer': ['ggpayer', 'payer'],
+        'ggPaye': ['ggpayee', 'paye'],
+        'uuid': ['uuid', 'remote_order_id'],
+        'ggPay': ['ggpay']
+    }
+        
+    def ensure_columns_exist(df, columns):
+        for column in columns:
+            if column not in df.columns:
+                df[column] = pd.NA
+        return df
+
+    def update_df(existing_df, new_df):
+        for column in new_df.columns:
+            if column in existing_df.columns:
+                existing_df[column].fillna(new_df[column], inplace=True)
+            else:
+                existing_df[column] = new_df[column]
+        return existing_df
+
     for file in os.listdir(uploadFilesPath):
         file_path = os.path.join(uploadFilesPath, file)
         if isExcelFile(file_path):
@@ -10,7 +79,6 @@ def load_data():
             for sheet in newExcelFile.sheet_names:
                 df_header = pd.read_excel(newExcelFile, sheet_name=sheet, nrows=0)
 
-                # Проверка наличия хотя бы одного ключевого слова в заголовках столбцов для Tips
                 for table in tablesKeyWords.keys():
                     if any(keyword in df_header.columns for keyword in tablesKeyWords[table]):
                         if table == "Tips":
@@ -25,7 +93,6 @@ def load_data():
                                 df = pd.read_excel(newExcelFile, sheet_name=sheet, usecols=columns_to_load, engine='openpyxl')
                                 df = df.copy()
 
-                                # Переименование столбцов
                                 renamed_columns = {}
                                 for column in df.columns:
                                     column_stripped = column.strip().lower()
@@ -36,26 +103,19 @@ def load_data():
                                 df.rename(columns=renamed_columns, inplace=True)
                                 df = replace_values(df)
 
-                                # Обработка времени
                                 if 'Date' in df.columns:
                                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-                                # Проверка и объединение данных по uuid
                                 if 'uuid' in df.columns:
                                     df.set_index('uuid', inplace=True)
 
-                                    # Удаление дубликатов внутри одного листа
                                     df = df[~df.index.duplicated(keep='last')]
 
-                                    # Проверка инициализации DataFrame Tips
                                     if Tips.empty:
                                         Tips = df.copy()
                                     else:
-                                        # Убедиться, что в Tips есть все столбцы из df
                                         Tips = ensure_columns_exist(Tips, df.columns)
-
-                                        # Объединение данных, не перезаписывая существующие
-                                        Tips.set_index('uuid', inplace=True, drop=False)
+                                        Tips.set_index('uuid', inplace=True, drop=False)  # Убедимся, что 'uuid' не будет потерян
                                         Tips.update(df)
                                         new_rows = df.loc[~df.index.isin(Tips.index)]
                                         Tips = pd.concat([Tips, new_rows], ignore_index=False)
@@ -66,9 +126,8 @@ def load_data():
                                 print("Company sheet is ", sheet)
                                 df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
                                 companies = pd.concat([companies, df_companies])
-
-                    # Обработка листа с данными о ggTeammates
-                    elif sheet.lower() == 'gg teammates':  # Проверка имени листа без учета регистра
+                    
+                    elif sheet.lower() == 'gg teammates':
                         df_teammates = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
 
                         if 'ID' in df_teammates.columns and 'NUMBER' in df_teammates.columns:
@@ -77,7 +136,6 @@ def load_data():
                         else:
                             print(f"'ID' or 'NUMBER' column not found in the sheet {sheet}")
 
-    # Обработка временных меток и создание дополнительных столбцов
     if 'Date' in Tips.columns:
         Tips['Date'] = pd.to_datetime(Tips['Date'], errors='coerce')
         Tips = Tips[Tips['Date'].dt.year > 2023]
@@ -113,5 +171,5 @@ def load_data():
         'defaultInputs': defaultInputs,
         'ggTeammates': ggTeammates
     }
-
+  
     return data

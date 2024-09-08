@@ -1,18 +1,21 @@
 import pandas as pd
 import os
+import streamlit as st
 
+uploadFilesPath = 'data/uploads/'
+
+# Функция для проверки является ли файл Excel или CSV
 def isExcelFile(file_path):
     _, file_extension = os.path.splitext(file_path)
     return file_extension.lower() in ['.csv', '.xlsx']
 
-uploadFilesPath = 'data/uploads/'
-
+# Функция для замены значений в DataFrame
 def replace_values(df):
     replacements = {
         'Status': {
             'transferred': 'finished',
             'fail': 'failed',
-            '2' : 'finished',
+            '2': 'finished',
             2: 'finished',
             '3': 'failed',
             3: 'failed',
@@ -21,25 +24,32 @@ def replace_values(df):
             'failure': 'failed'
         }
     }
-    
     for column, replace_dict in replacements.items():
         if column in df.columns:
             df[column] = df[column].replace(replace_dict)
-    
     return df
-def load_data():
-    if not os.path.exists(uploadFilesPath):
-        os.makedirs(uploadFilesPath)
-    
+
+# Функция для загрузки данных
+def load_data(file_path=None):
+        
+    if file_path:
+        files_to_process = [file_path]
+    else:
+        if not os.path.exists(uploadFilesPath):
+            os.makedirs(uploadFilesPath)
+        
+        files_to_process = [os.path.join(uploadFilesPath, file) for file in os.listdir(uploadFilesPath)]
+
+
     Tips = pd.DataFrame()
     companies = pd.DataFrame()
     ggTeammates = pd.DataFrame()
-    
+
     tablesKeyWords = {
         'Tips': ['uuid', 'Meta Data', 'Review comment', 'paymentStateId', 'error_desc', 'remote_order_id', 'Payment processor', 'status'],
         'Companies': ['helpercompanyname', 'Adress', 'Working status', 'Coordinate', 'Region']
     }
-    
+
     columnsKeyWords = {
         'Company': ['company', 'company name', 'company_name'],
         'Partner': ['partner', 'partner name', 'partner_name'],
@@ -50,27 +60,25 @@ def load_data():
         'ggPayer': ['ggpayer', 'payer'],
         'ggPaye': ['ggpayee', 'paye'],
         'uuid': ['uuid', 'remote_order_id'],
-        'ggPay': ['ggpay']
+        'ggPay': ['ggpay'],
+        'Median': ['median']
     }
-        
+
     def ensure_columns_exist(df, columns):
         for column in columns:
             if column not in df.columns:
                 df[column] = pd.NA
         return df
 
-    def update_df(existing_df, new_df):
-        for column in new_df.columns:
-            if column in existing_df.columns:
-                existing_df[column].fillna(new_df[column], inplace=True)
-            else:
-                existing_df[column] = new_df[column]
-        return existing_df
+    # Проверка на наличие файлов
+    if not files_to_process:
+        st.warning("Нет загруженных файлов для обработки.")
+        return {'tips': pd.DataFrame(), 'companies': pd.DataFrame(), 'ggTeammates': pd.DataFrame(), 'defaultInputs': {}}
 
-    for file in os.listdir(uploadFilesPath):
-        file_path = os.path.join(uploadFilesPath, file)
+    for file_path in files_to_process:
         if isExcelFile(file_path):
             newExcelFile = pd.ExcelFile(file_path)
+
 
             for sheet in newExcelFile.sheet_names:
                 df_header = pd.read_excel(newExcelFile, sheet_name=sheet, nrows=0)
@@ -86,7 +94,7 @@ def load_data():
                                         columns_to_load.append(column)
 
                             if columns_to_load:
-                                df = pd.read_excel(newExcelFile, sheet_name=sheet, usecols=columns_to_load, engine='openpyxl')
+                                df = pd.read_excel(newExcelFile, sheet_name=sheet, usecols=columns_to_load)
                                 df = df.copy()
 
                                 renamed_columns = {}
@@ -119,21 +127,17 @@ def load_data():
                                 else:
                                     print(f"'uuid' column not found in the sheet {sheet}")
                         elif table == 'Companies':
-                            df_companies = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
+                            df_companies = pd.read_excel(newExcelFile, sheet_name=sheet)
                             companies = pd.concat([companies, df_companies])
 
                     elif sheet.lower() == 'gg teammates' or sheet.lower() == 'gg_teammates':
-                        print('We in ggTeammates sheet')
-                        df_teammates = pd.read_excel(newExcelFile, sheet_name=sheet, engine='openpyxl')
+                        df_teammates = pd.read_excel(newExcelFile, sheet_name=sheet)
 
                         if 'ID' in df_teammates.columns and 'NUMBER' in df_teammates.columns:
                             ggTeammates['id'] = df_teammates['ID']
                             ggTeammates['number'] = df_teammates['NUMBER']
                         else:
                             print(f"'ID' or 'NUMBER' column not found in the sheet {sheet}")
-                    else:
-                        print('Not found ggTeammates sheet')
-
 
     if 'Date' in Tips.columns:
         Tips['Date'] = pd.to_datetime(Tips['Date'], errors='coerce')
@@ -146,15 +150,17 @@ def load_data():
         Tips['Week day'] = Tips['Date'].dt.weekday
         Tips['WeekStart'] = pd.to_datetime(Tips['Year'].astype(str) + Tips['Week'].astype(str) + '1', format='%Y%W%w')
         Tips['WeekEnd'] = Tips['WeekStart'] + pd.Timedelta(days=6)
-    
+
     if 'Company' in Tips.columns and 'Partner' in Tips.columns:
         Tips['Company'] = Tips['Company'].astype(str)
         Tips['Partner'] = Tips['Partner'].astype(str)
         Tips['companyPartner'] = Tips['Company'] + '_' + Tips['Partner']
-
+    
+    oneAverageTip = Tips[Tips['Amount'] > 100]['Amount'].sum() / Tips[Tips['Amount'] > 100]['Amount'].count()
+    
     defaultInputs = {
         'selectedMonth': [],
-        'ggPayeers': 'Wihout gg teammates',
+        'ggPayeers': 'Without gg teammates',
         'amountFilterMin': 110,
         'amountFilterMax': 50000,
         'timeInterval': 'Week',
@@ -168,7 +174,8 @@ def load_data():
         'tips': Tips,
         'companies': companies,
         'defaultInputs': defaultInputs,
-        'ggTeammates': ggTeammates
+        'ggTeammates': ggTeammates,
+        'oneAverageTip': oneAverageTip
     }
 
     return data

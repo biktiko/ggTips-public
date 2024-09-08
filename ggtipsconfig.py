@@ -11,6 +11,7 @@ import pandas as pd
 # print(hashed_passwords)
 
 def login():
+
     with open('config.yaml', 'r', encoding='utf-8') as file:
         config = yaml.load(file, Loader=SafeLoader)
 
@@ -21,15 +22,25 @@ def login():
         config['cookie']['key'],
         config['cookie']['expiry_days'],
     )
+    
+    st.title('ggTips Analyze')
 
-    # Creating a login widget
     try:
         authenticator.login()
     except LoginError as e:
         st.error(e)
 
-    return authenticator
+    if not st.session_state.get('authentication_status', False):
+        # Кнопка демо-режима показывается только при отсутствии аутентификации
+        demo_mode = st.button("See how the program works with random data")
 
+        if demo_mode:
+            st.session_state['authentication_status'] = True
+            st.session_state['demo_mode'] = True
+            st.session_state['username'] = "demo_user"  # Временно присваиваем имя демо-пользователя
+            st.rerun()  # Перезапуск страницы для загрузки демо-режима
+
+    return authenticator
 def formatTimeIntervals(df, time_interval):
     if time_interval == 'Month':
         df['Month'] = pd.Categorical(df['Month'].apply(lambda x: calendar.month_name[x]), 
