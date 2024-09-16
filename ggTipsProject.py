@@ -6,9 +6,6 @@ from data.ggTipsData import load_data, uploadFilesPath
 from ggtipsconfig import login, formatTimeIntervals
 import folium
 from streamlit_folium import folium_static
-import matplotlib.pyplot as plt
-
-
 
 st.set_page_config(layout='wide')
 
