@@ -6,10 +6,11 @@ from data.ggTipsData import load_data, uploadFilesPath
 from ggtipsconfig import login, formatTimeIntervals
 import folium
 from streamlit_folium import folium_static
+import matplotlib.pyplot as plt
+
 
 
 st.set_page_config(layout='wide')
-
 
 def customInterval(df, days):
     df['Custom'] = df['Date'] - pd.to_timedelta(df['Date'].dt.dayofyear % days, unit='d')
@@ -150,10 +151,10 @@ if st.session_state['authentication_status']:
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.number_input('Min amount', value=110, step=1000, min_value=0, max_value=50000, key='amountFilterMin')
+                    st.number_input('Min amount', value=st.session_state['amountFilterMin'], step=1000, min_value=0, max_value=50000, key='amountFilterMin')
 
                 with col2:
-                    st.number_input('Max amount', value=50000, step=1000, min_value=0, max_value=50000, key='amountFilterMax')
+                    st.number_input('Max amount', value=st.session_state['amountFilterMax'], step=1000, min_value=0, max_value=50000, key='amountFilterMax')
                     
                 timeIntervalOptions = ['Week', 'Month', 'Year', 'Week day', 'Day', 'Hour', 'Custom day']
 
@@ -311,9 +312,7 @@ if st.session_state['authentication_status']:
                 
             with col3:
                 st.write('Partners', partnersCount)
-                    
-                
-                
+                               
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -568,71 +567,260 @@ if st.session_state['authentication_status']:
                     )
                     st.altair_chart(chart, use_container_width=True)
                     
-                    st.write('The bottom is not ready!')
+                    st.write('Company activation module in demo version!')
                     period = st.number_input('Period', value=7, step=1, min_value=1, key='PeriodValue')
                     
-                    companyActiveDays = companies.groupby('Company')['Days'].max().reset_index()    
-                                    
-                    if 'Status' in tips.columns:
-                        totalPeriodTips = tips[(tips['Date'] < today - pd.Timedelta(days=period)) & (tips['Status'] == 'finished')]
+                    # Prepare 'companyActiveDays' DataFrame
+                    companyActiveDays = companies.groupby('Company')['Days'].max().reset_index()
+                    companyActiveDays['Company_cleaned'] = companyActiveDays['Company'].str.lower().str.replace(' ', '')
+                    # Keep only necessary columns to avoid conflicts
+                    companyActiveDays = companyActiveDays[['Company_cleaned', 'Days']]
+
+                    # Prepare 'cleverTips' DataFrame
+                    cleverTips = tips.copy()
+                    cleverTips = cleverTips[~cleverTips['ggPayer'].isin(ggTeammates['id'])]
+
+                    # Filter 'totalPeriodTips' based on the 'Status' column
+                    if 'Status' in cleverTips.columns:
+                        totalPeriodTips = cleverTips[
+                            (cleverTips['Date'] < today - pd.Timedelta(days=period)) &
+                            (cleverTips['Status'] == 'finished')
+                        ]
                     else:
-                        totalPeriodTips = tips[tips['Date'] < today - pd.Timedelta(days=period)]
-                        
-                    if 'Status' in tips.columns:
-                        lastPeriodTIps = tips[(tips['Date'] >= today - pd.Timedelta(days=period))  & (tips['Status'] == 'finished')]
-                    else:
-                        lastPeriodTIps = tips[tips['Date'] >= today - pd.Timedelta(days=period)]
-                                            
+                        totalPeriodTips = cleverTips[cleverTips['Date'] < today - pd.Timedelta(days=period)]
+
+                    # Group 'totalPeriodTips' to get 'totalPeriodScopes'
                     totalPeriodScopes = totalPeriodTips.groupby('Company').agg({
                         'Amount': 'sum',
                         'uuid': 'count'
                     }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
-                    
+
                     totalPeriodScopes['Company_cleaned'] = totalPeriodScopes['Company'].str.lower().str.replace(' ', '')
-                    companyActiveDays['Company_cleaned'] = companyActiveDays['Company'].str.lower().str.replace(' ', '')
-                                    
-                    totalPeriodScopes = totalPeriodScopes.merge(median_all_data, on='Company', how='left')
-                    totalPeriodScopes = totalPeriodScopes.merge(companyActiveDays, on='Company_cleaned', how='left')
+
+                    # Rename columns in 'median_all_data' to avoid conflicts
+                    median_all_data = median_all_data.rename(columns={'Median': 'Median_MAD'})
+
+                    # Merge 'totalPeriodScopes' with 'median_all_data' on 'Company'
+                    totalPeriodScopes = totalPeriodScopes.merge(
+                        median_all_data[['Company', 'Median_MAD']],
+                        on='Company',
+                        how='left'
+                    )
+
+                    # Merge 'totalPeriodScopes' with 'companyActiveDays' on 'Company_cleaned'
+                    totalPeriodScopes = totalPeriodScopes.merge(
+                        companyActiveDays,
+                        on='Company_cleaned',
+                        how='left'
+                    )
+
+                    # Drop 'Company_cleaned' if it's no longer needed
                     totalPeriodScopes.drop(columns=['Company_cleaned'], inplace=True)
-                   
+
+                    # Prepare 'lastPeriodTips' DataFrame
+                    if 'Status' in cleverTips.columns:
+                        lastPeriodTips = cleverTips[
+                            (cleverTips['Date'] >= today - pd.Timedelta(days=period)) &
+                            (cleverTips['Status'] == 'finished')
+                        ]
+                    else:
+                        lastPeriodTips = cleverTips[cleverTips['Date'] >= today - pd.Timedelta(days=period)]
+
+                    # Group 'lastPeriodTips'
+                    lastPeriodTips = lastPeriodTips.groupby('Company').agg({
+                        'Amount': 'sum',
+                        'uuid': 'count'
+                    }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
+
+                    lastPeriodTips['Company_cleaned'] = lastPeriodTips['Company'].str.lower().str.replace(' ', '')
+
+                    # Merge 'lastPeriodTips' with 'median_all_data' on 'Company'
+                    lastPeriodTips = lastPeriodTips.merge(
+                        median_all_data[['Company', 'Median_MAD']],
+                        on='Company',
+                        how='left'
+                    )
+
+                    # Merge 'lastPeriodTips' with 'companyActiveDays' on 'Company_cleaned'
+                    lastPeriodTips = lastPeriodTips.merge(
+                        companyActiveDays,
+                        on='Company_cleaned',
+                        how='left'
+                    )
+
+                    # Drop 'Company_cleaned' if it's no longer needed
+                    lastPeriodTips.drop(columns=['Company_cleaned'], inplace=True)
+
+                    def calculate_scope(row, period_length):
+                        if pd.notna(row['Median_MAD']) and row['Median_MAD'] != 0 and period_length > 0 and row['Days']>period_length:
+                            return round(
+                                (
+                                    (row['Amount'] / row['Median_MAD']) +
+                                    (row['Amount'] / data['oneAverageTip'])
+                                ) / period_length,
+                                1
+                            )
+                        else:
+                            return 0
+                        
                     totalPeriodScopes['Scope'] = totalPeriodScopes.apply(
-                        lambda row: round(((row['Amount'] / row['Median']) + (row['Amount'] / data['oneAverageTip'])), 1)
-                        if pd.notna(row['Median']) and row['Median'] != 0 else 0, axis=1)
-                    totalPeriodScopes['Scope'] = totalPeriodScopes['Scope'].fillna(0)     
-                    st.write(totalPeriodScopes)
+                        lambda row: calculate_scope(row, row['Days'] - period),
+                        axis=1
+                    )
 
-                    
-                #     companiesGroupedTips['Scope'] = companiesGroupedTips.apply(
-                #         lambda row: round((row['Amount'] / row['Median']) + (row['Amount'] / data['oneAverageTip']), 1) 
-                #         if pd.notna(row['Median']) and row['Median'] != 0 else 0, axis=1)
-                #     companiesGroupedTips['Scope'] = companiesGroupedTips['Scope'].fillna(0)        
-                    
-                    # companyConnections = companies.groupby('Company')['Days'].max()
-                    
-                    # companiesGroupedTips = companiesGroupedTips.merge(companyConnections, on='Company', how='left')
-                    
-                    # companiesGroupedTips['TotalAverage'] = companiesGroupedTips.apply(
-                    #     lambda row: round(tips[(tips['Company'] == row['Company']) & (tips['Date'] < today - pd.Timedelta(days=period))]['Amount'].sum()  / (row['Days']-period), 1), axis=1
-                    # )
-                    
+                    # Расчет 'Scope' для последнего периода
+                    lastPeriodTips['Scope'] = lastPeriodTips.apply(
+                        lambda row: calculate_scope(row, period),
+                        axis=1
+                    )
 
-                    # # LastPeriodAverage — Среднее за последние 30 дней
-                    # companiesGroupedTips['LastPeriodAverage'] = companiesGroupedTips.apply(
-                    #     lambda row: round(tips[(tips['Company'] == row['Company']) & (tips['Date'] >= today - pd.Timedelta(days=period))]['Amount'].sum() / period, 1), axis=1
-                    # )
+                    # Display 'lastPeriodTips' DataFrame
 
-                    # # Вычисляем изменения по отношению к TotalAverage
-                    # companiesGroupedTips['Percentage Change'] = companiesGroupedTips.apply(
-                    #     lambda row: (row['LastPeriodAverage'] / row['TotalAverage'] * 100 - 100) if pd.notna(row['TotalAverage']) and row['TotalAverage'] != 0 else 100, axis=1
-                    # )
+                    mergedScopes = pd.merge(
+                        totalPeriodScopes[['Company', 'Scope']],
+                        lastPeriodTips[['Company', 'Scope']],
+                        on='Company',
+                        how='outer',
+                        suffixes=('_total', '_last')
+                    )
 
-                    # Отображение данных в Streamlit
-                    # with st.container():
-                    #     st.write(companiesGroupedTips[['Company', 'TotalAverage', 'LastPeriodAverage', 'Percentage Change']])
-                    
-                    
+                    # Заполняем отсутствующие значения нулями
+                    mergedScopes.fillna(0, inplace=True)
 
-                    
+                    # Добавляем возможность выбора формата разницы
+                    format_option = st.selectbox(
+                        'Выберите формат разницы баллов компаний:',
+                        ('Числовой', 'Процентный')
+                    )
+
+                    # Вычисляем differentScope в зависимости от выбранного формата
+                    if format_option == 'Числовой':
+                        mergedScopes['differentScope'] = mergedScopes['Scope_last'] - mergedScopes['Scope_total']
+                        # Устанавливаем цвета для столбцов
+                        mergedScopes['color'] = mergedScopes['differentScope'].apply(
+                            lambda x: 'green' if x >= 0 else 'red'
+                        )
+                    else:
+                        # Избегаем деления на ноль и вычисляем процентную разницу
+                        def calculate_percentage(row):
+                            if row['Scope_total'] != 0:
+                                return ((row['Scope_last'] - row['Scope_total']) / row['Scope_total']) * 100
+                            else:
+                                return 0
+                        mergedScopes['differentScope'] = mergedScopes.apply(calculate_percentage, axis=1)
+
+                    # Ограничиваем значения differentScope до 200 и устанавливаем цвет фиолетовым для значений >200
+                    def set_color(value):
+                        if value > 200:
+                            return 'purple'
+                        elif value >= 0:
+                            return 'green'
+                        elif value > (-100):
+                            return 'orange'
+                        else:
+                            return 'red'
+
+                    mergedScopes['color'] = mergedScopes['differentScope'].apply(set_color)
+                    # Ограничиваем значение differentScope до 200
+                    mergedScopes['differentScope'] = mergedScopes['differentScope'].apply(lambda x: min(x, 200))
+
+                    # Сортируем данные по differentScope от большего к меньшему
+                    mergedScopes = mergedScopes.sort_values(by='differentScope', ascending=False)
+
+                   # Данные для графика (где differentScope не равен 0)
+                    chart_data = mergedScopes[
+                        (mergedScopes['differentScope'] != 0) |
+                        (
+                            (mergedScopes['differentScope'] == 0) &
+                            (
+                                (mergedScopes['Scope_total'] != 0) |
+                                (mergedScopes['Scope_last'] != 0)
+                            )
+                        )
+                    ]
+
+                    # Данные для таблицы:
+                    table_data = mergedScopes[
+                        (mergedScopes['Scope_total'] == 0) &
+                        (mergedScopes['Scope_last'] == 0)
+                    ]
+
+                    # Сортируем данные для графика по differentScope от большего к меньшему
+                    chart_data = mergedScopes[
+                        (mergedScopes['differentScope'] != 0) |
+                        (
+                            (mergedScopes['differentScope'] == 0) &
+                            (
+                                (mergedScopes['Scope_total'] != 0) |
+                                (mergedScopes['Scope_last'] != 0)
+                            )
+                        )
+                    ]
+
+                    table_data = mergedScopes[
+                        (mergedScopes['Scope_total'] == 0) &
+                        (mergedScopes['Scope_last'] == 0)
+                    ]
+
+                    # Убедимся, что differentScope не содержит NaN
+                    chart_data['differentScope'] = chart_data['differentScope'].fillna(0)
+
+                    # Создаем список всех компаний для оси X
+                    company_list = chart_data['Company'].tolist()
+
+                    # Настраиваем ось X
+                    x_axis = alt.X('Company:N', sort=company_list, axis=alt.Axis(title='Компания', labelAngle=-45))
+
+                    # Определяем минимальное и максимальное значение для оси Y
+                    min_y = chart_data['differentScope'].min()
+                    max_y = chart_data['differentScope'].max()
+
+                    # Если min_y и max_y равны, добавим небольшой диапазон
+                    if min_y == max_y:
+                        min_y -= 1
+                        max_y += 1
+
+                    # Настраиваем ось Y
+                    y_axis = alt.Y('differentScope:Q', 
+                                axis=alt.Axis(title='Разница в баллах'),
+                                scale=alt.Scale(domain=[min_y, max_y]))
+
+                    # Базовый график
+                    base_chart = alt.Chart(chart_data).encode(
+                        x=x_axis,
+                        tooltip=['Company', 'differentScope', 'Scope_total', 'Scope_last']
+                    ).properties(
+                        width=800,
+                        height=400
+                    )
+
+                    # Столбцы для differentScope != 0
+                    bar_chart = base_chart.transform_filter(
+                        alt.datum.differentScope != 0
+                    ).mark_bar().encode(
+                        y=y_axis,
+                        color=alt.Color('color:N', scale=None, legend=None)
+                    )
+
+                    # Точки для differentScope == 0
+                    zero_chart = base_chart.transform_filter(
+                        alt.datum.differentScope == 0
+                    ).mark_point(size=100, shape='circle', color='black').encode(
+                        y='differentScope:Q'
+                    )
+
+                    # Комбинируем графики
+                    final_chart = alt.layer(bar_chart, zero_chart).resolve_scale(
+                        y='shared'
+                    )
+
+                    # Отображаем график
+                    st.altair_chart(final_chart, use_container_width=True)
+
+                    # Отображаем таблицу для компаний без транзакций
+                    st.write("Компании без транзакций в обоих периодах (Scope_total и Scope_last равны нулю):")
+                    st.dataframe(table_data[['Company', 'Scope_total', 'Scope_last', 'differentScope']])
+
         with CompanyConnectionsTab:
             if not date_range:
                 start_date = pd.to_datetime('2024-01-01')
