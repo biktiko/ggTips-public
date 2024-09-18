@@ -1,6 +1,5 @@
 working email, avatar, partnerMessage, json_agg, Real? -> Partners
 
-
 3 talbeKeyWords upgrade
 5. reset button
 6. հանդիպումների քարտեզ
@@ -14,6 +13,10 @@ working email, avatar, partnerMessage, json_agg, Real? -> Partners
 17 companies name fix. example two beer academy. big, small letters question
 18 column width custom filter
 19 fix errors when data is empty
+20 Different scope only for companies with days>period
+21 make different scope percentage sorting more logic
+22 stats for different scope
+23 table / chart different scope
 
 
 completed
