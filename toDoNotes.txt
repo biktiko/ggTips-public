@@ -9,7 +9,8 @@ working email, avatar, partnerMessage, json_agg, Real? -> Partners
 24 set custom limit for companies activities
 25 Capital letters at companies-tips
 26 last tip info in stats
-17 users table ggpayer to int
+27 users table ggpayer to int
+28 import data to sidebar
 
 completed
 13. fix hours. sometimes +4. sometimes not
