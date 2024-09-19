@@ -57,7 +57,7 @@ if st.session_state['authentication_status']:
                     st.write(f"Number of rows: {len(df)}")
                     st.write("---")
 
-            clearFolderButtonClicked = st.button("Delete all new files", key="clearFolderButton")
+            clearFolderButtonClicked = st.button("Delete all files", key="clearFolderButton")
 
             if clearFolderButtonClicked:
                 # Обновляем состояние до удаления файлов
@@ -91,9 +91,6 @@ if st.session_state['authentication_status']:
 
     os.makedirs(uploadFilesPath, exist_ok=True)
     
-
-    st.title('ggTips')
-
     if not tips.empty:
         options = {
             'companiesOptions': list(tips['Company'].unique()) if 'Company' in tips else ['All'],
@@ -167,7 +164,6 @@ if st.session_state['authentication_status']:
                         with col2:
                             st.number_input('Custom', value=10, step=1, min_value=1, key='customInterval')
 
-                
             with st.expander('**Graph Customize**'):
                 
                 col1, col2, col3 = st.columns(3)
@@ -285,7 +281,7 @@ if st.session_state['authentication_status']:
             connectionDays = filteredCompanies['Days'].max()
             companiesCount = int(companies.groupby('HELPERcompanyName')['Working status'].max().sum())
             branchesCount = companies['Working status'].sum() 
-            partnersCount = filteredTips['Partner'].nunique()
+            # partnersCount = filteredTips['Partner'].nunique()
             
             if countTips !=0:
                 averageTip = round(sumTips / countTips)
@@ -307,8 +303,8 @@ if st.session_state['authentication_status']:
             with col2:
                 st.write('Branches: ', branchesCount)
                 
-            with col3:
-                st.write('Partners', partnersCount)
+            # with col3:
+            #     st.write('Partners', partnersCount)
                                
             col1, col2, col3 = st.columns(3)
             

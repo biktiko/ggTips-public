@@ -1,6 +1,5 @@
 import pandas as pd
 import os
-import streamlit as st
 
 uploadFilesPath = 'data/uploads/'
 
@@ -72,7 +71,7 @@ def load_data(file_path=None):
 
     # Проверка на наличие файлов
     if not files_to_process:
-        st.warning("Нет загруженных файлов для обработки.")
+        print("Data is empty.")
         return {'tips': pd.DataFrame(), 'companies': pd.DataFrame(), 'ggTeammates': pd.DataFrame(), 'defaultInputs': {}}
 
     for file_path in files_to_process:

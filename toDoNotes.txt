@@ -4,21 +4,28 @@ working email, avatar, partnerMessage, json_agg, Real? -> Partners
 5. reset button
 6. հանդիպումների քարտեզ
 9. save filters to cache
-10. import data разобраться
 11. terminal possible errors check with chat gpt
 12. comments to english
-14 sorting
-15 payment processor to fix
-16 new partners table
-17 companies name fix. example two beer academy. big, small letters question
-18 column width custom filter
-19 fix errors when data is empty
-20 Different scope only for companies with days>period
-21 make different scope percentage sorting more logic
-22 stats for different scope
-23 table / chart different scope
-
+24 set custom limit for companies activities
+25 Capital letters at companies-tips
+26 last tip info in stats
+17 users table ggpayer to int
 
 completed
 13. fix hours. sometimes +4. sometimes not
 7. fix see import files details bug
+10. import data разобраться
+14 sorting
+15 payment processor to fix
+17 companies name fix. example two beer academy. big, small letters question
+18 column width custom filter
+19 fix errors when data is empty
+20 Different scope only for companies with days>period
+23 table / chart different scope
+21 make different scope percentage sorting more logic
+22 stats for different scope
+
+
+
+
+
