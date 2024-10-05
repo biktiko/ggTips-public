@@ -454,7 +454,10 @@ if st.session_state['authentication_status']:
 
                     if 'groupedTips' in locals():
                         with st.expander('Table', True):
-                            st.write(groupedTips[['Week', 'Amount', 'WeekStart', 'WeekEnd']])
+                            if 'WeekStart' in groupedTips.columns:
+                                st.write(groupedTips[['Week', 'Amount', 'WeekStart', 'WeekEnd']])
+                            else:
+                                st.write(groupedTips)
 
         with CompaniesTipsTab:
                 
