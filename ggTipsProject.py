@@ -3,11 +3,32 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from data.ggTipsData import load_data, uploadFilesPath
-from ggtipsconfig import login, formatTimeIntervals
+from ggtipsconfig import login  # Удалите импорт formatTimeIntervals из ggtipsconfig, если он определён в основном коде
 import folium
 from streamlit_folium import folium_static
+import calendar
 
 st.set_page_config(layout='wide')
+
+def formatTimeIntervals(df, time_interval):
+    if time_interval == 'Weekday':
+        # Преобразуем числовой день недели в его название
+        df['Week day'] = pd.to_datetime(df['Period']).dt.weekday
+        df['Week day'] = pd.Categorical(
+            df['Week day'].apply(lambda x: calendar.day_name[x]),
+            categories=list(calendar.day_name),
+            ordered=True
+        )
+    elif time_interval == 'Day':
+        df['Period'] = pd.to_datetime(df['Period']).dt.strftime('%Y-%m-%d')
+    elif time_interval == 'Hour':
+        df['Period'] = pd.to_datetime(df['Period']).dt.strftime('%Y-%m-%d %H:00')
+    elif time_interval == 'All':
+        df['Period'] = pd.to_datetime(df['Period']).dt.strftime('%Y-%m-%d')
+    elif time_interval == 'Custom day':
+        df['Period'] = pd.to_datetime(df['Period']).dt.floor(f'{df["Custom"].iloc[0]}D')
+    # Добавьте другие интервалы по необходимости
+    return df
 
 def customInterval(df, days):
     df['Custom'] = df['Date'] - pd.to_timedelta(df['Date'].dt.dayofyear % days, unit='d')
@@ -19,11 +40,6 @@ if st.session_state['authentication_status']:
     # Настройки боковой панели
     with st.sidebar:
 
-        st.markdown(f'''
-            <style>
-            section[data-testid="stSidebar"] .css-ng1t4o {{width: 30rem;}}
-            </style>
-        ''',unsafe_allow_html=True)
         st.header('Settings')
 
         if st.session_state.get('demo_mode', False):
@@ -80,7 +96,7 @@ if st.session_state['authentication_status']:
         companies = data['companies']
         tips = data['tips']
         if 'Amount' in tips.columns:
-            tips = tips[tips['Amount']>100]
+            tips = tips[tips['Amount'] > 100]
         ggTeammates = data['ggTeammates']
         defaultInputs = data['defaultInputs']
 
@@ -99,7 +115,7 @@ if st.session_state['authentication_status']:
                     'partnersOptions': list(tips['Partner'].unique()) if 'Partner' in tips else ['All'],
                     'paymentProcessorOptions': list(tips['Payment processor'].dropna().unique()) if 'Payment processor' in tips else ['All'],
                     'statusOptions': list(tips['Status'].unique()) if 'Status' in tips else ['All'],
-                    'ggPayeersOptions': ['All', 'Without gg teammates', 'Only gg teammates']  # Исправление здесь
+                    'ggPayeersOptions': ['All', 'Without gg teammates', 'Only gg teammates']
                 }
                 
                 col1, col2 = st.columns(2)
@@ -111,8 +127,11 @@ if st.session_state['authentication_status']:
                     date_range = st.date_input("Select date range", [])
                     
                     if date_range:
-                        start_date, end_date = date_range
-                        filteredTips = filteredTips[(filteredTips['Date'] >= pd.to_datetime(start_date)) & (filteredTips['Date'] <= pd.to_datetime(end_date))]
+                        if len(date_range) != 2:
+                            st.warning("Please select a start and end date.")
+                        else:
+                            start_date, end_date = date_range
+                            filteredTips = filteredTips[(filteredTips['Date'] >= pd.to_datetime(start_date)) & (filteredTips['Date'] <= pd.to_datetime(end_date))]
 
                 col1, col2 = st.columns(2)
                     
@@ -133,7 +152,7 @@ if st.session_state['authentication_status']:
                 with col2:
                     st.number_input('Max amount', value=st.session_state['amountFilterMax'], step=1000, min_value=0, max_value=50000, key='amountFilterMax')
                     
-                timeIntervalOptions = ['Week', 'Month', 'Year', 'Week day', 'Day', 'Hour', 'Custom day']
+                timeIntervalOptions = ['Week', 'Month', 'Year', 'Week day', 'Day', 'Hour', 'Custom day', 'All']
 
                 if 'timeInterval' in st.session_state: 
                     if st.session_state['timeInterval'] != 'Custom day':
@@ -146,19 +165,21 @@ if st.session_state['authentication_status']:
 
                         with col2:
                             st.number_input('Custom', value=10, step=1, min_value=1, key='customInterval')
+
+                    if st.session_state['timeInterval'] == 'Custom day':
+                        custom_days = st.session_state.get('customInterval', 10)
+                        filteredTips = customInterval(filteredTips, custom_days)
+                        time_interval = 'Custom day'
+                    else:
+                        time_interval = st.session_state['timeInterval']
+                else:
+                    st.write("Problem with time Interval")
         
             with st.expander('**Graph values**', True):
                 
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    sum_type = st.selectbox('Sum Chart', ['Column', 'Line', 'Area', 'None'])
-                with col2:
-                    
-                    count_type = st.selectbox('Count Chart', ['Line', 'Column', 'Area', 'None'])
-                with col3:
-                    
-                    scope_type = st.selectbox('Scope Chart', ['Line', 'Column', 'Area', 'None'])
+                sum_type = st.selectbox('Sum Chart', ['Column', 'Line', 'Area', 'None'])
+                count_type = st.selectbox('Count Chart', ['Line', 'Column', 'Area', 'None'])
+                scope_type = st.selectbox('Scope Chart', ['Line', 'Column', 'Area', 'None'])
 
             with st.expander('**Graph Customize**'):
                 
@@ -171,13 +192,11 @@ if st.session_state['authentication_status']:
                     scope_color = st.color_picker('Scope Color', '#A020F0')
                     
                 text_color = st.color_picker('Text Color', '#FFFFFF')
-                chart_width = st.slider('Chart Width', 600, 1200, 1000)
-                chart_height = st.slider('Chart Height', 400, 800, 500)
                 column_size = st.slider('Column Size', 3, 30, 15)
                 reset_button = st.button('Reset Settings')
 
         if 'Working status' in filteredCompanies:
-            filteredCompanies= filteredCompanies[filteredCompanies['Working status']]
+            filteredCompanies = filteredCompanies[filteredCompanies['Working status']]
 
         os.makedirs(uploadFilesPath, exist_ok=True)
         
@@ -188,14 +207,14 @@ if st.session_state['authentication_status']:
                     # Сброс состояния для демо-версии
                     st.session_state['authentication_status'] = False
                     st.session_state['demo_mode'] = False
-                    st.rerun()  # Перезагружаем страницу после выхода
+                    st.experimental_rerun()  # Перезагружаем страницу после выхода
             else:
                 if 'authenticator' in globals() and authenticator is not None:
                     authenticator.logout('Logout', 'sidebar')
                 else:
                     if st.button('Logout'):
                         st.session_state['authentication_status'] = False
-                        st.rerun()
+                        st.experimental_rerun()
         else:
             st.warning("Please enter your username and password")
 
@@ -231,25 +250,45 @@ if st.session_state['authentication_status']:
                 filteredTips = filteredTips[filteredTips['ggPayer'].isin(ggTeammates['id'])]
 
         # Применение группировки по интервалу времени
-        if st.session_state['timeInterval'] == 'Custom day':
-            custom_days = st.session_state.get('customInterval', 10)
-            filteredTips = customInterval(filteredTips, custom_days)
-            time_interval = 'Custom'
+
+        if time_interval == 'All':
+            groupedTips = filteredTips.groupby(filteredTips['Date'].dt.date).agg({
+                'Amount': 'sum',
+                'uuid': 'count',
+            }).reset_index().rename(columns={'Date': 'Period', 'uuid': 'Count', 'Amount': 'Amount'})
+        elif time_interval == 'Day':
+            groupedTips = filteredTips.groupby(filteredTips['Date'].dt.date).agg({
+                'Amount': 'sum',
+                'uuid': 'count',
+            }).reset_index().rename(columns={'Date': 'Period', 'uuid': 'Count', 'Amount': 'Amount'})
+        elif time_interval == 'Hour':
+            groupedTips = filteredTips.groupby(filteredTips['Date'].dt.hour).agg({
+                'Amount': 'sum',
+                'uuid': 'count',
+            }).reset_index().rename(columns={'Date': 'Period', 'uuid': 'Count', 'Amount': 'Amount'})
+        elif time_interval == 'Weekday':
+            # Убедитесь, что столбец 'Week day' существует
+            if 'Week day' not in filteredTips.columns:
+                filteredTips['Week day'] = filteredTips['Date'].dt.weekday
+            groupedTips = filteredTips.groupby('Week day').agg({
+                'Amount': 'sum',
+                'uuid': 'count',
+            }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
         else:
-            time_interval = st.session_state['timeInterval']
+            # Существующая логика для других интервалов
+            groupedTips = filteredTips.groupby(time_interval).agg({
+                'Amount': 'sum',
+                'uuid': 'count',
+                'WeekStart': 'max',
+                'WeekEnd': 'max'
+            }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
+            
+            if time_interval in ['Week', 'Month', 'Year']:
+                groupedTips['Period'] = groupedTips['WeekStart']  # Используем только начальную дату
+            else:
+                groupedTips['Period'] = groupedTips[time_interval].astype(str)
 
-        groupedTips = filteredTips.groupby(time_interval).agg({
-            'Amount': 'sum',
-            'uuid': 'count',  
-            'WeekStart': 'max',
-            'WeekEnd': 'max'
-        }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
-
-        if time_interval not in ['Week', 'Month', 'Year']:
-            groupedTips['Period'] = groupedTips[time_interval].astype(str)
-        else:
-            groupedTips['Period'] = groupedTips['WeekStart'].dt.strftime('%Y-%m-%d') + ' - ' + groupedTips['WeekEnd'].dt.strftime('%Y-%m-%d')
-
+        # Форматирование интервалов
         groupedTips = formatTimeIntervals(groupedTips, time_interval)
                         
         with st.expander('stats'):
@@ -262,24 +301,14 @@ if st.session_state['authentication_status']:
             companiesCount = int(companies.groupby('HELPERcompanyName')['Working status'].max().sum())
             branchesCount = companies['Working status'].sum() 
 
-            # lastTransaction = tips.groupby('Company')['Date'].max().reset_index()
-            # lastTransaction.columns = ['Company', 'Last transaction']
-            # lastTransaction['Last Transaction'] = lastTransaction['Last transaction'].fillna(pd.Timestamp.max)
-
-            # companiesGroupedTips = companiesGroupedTips.merge(lastTransaction, on='Company', how='left')
-            
-            # today = pd.to_datetime('today')
-            # companiesGroupedTips['Days since last transaction'] = (today - companiesGroupedTips['Last transaction']).dt.days
-            # partnersCount = filteredTips['Partner'].nunique()
-            
             if countTips !=0:
                 averageTip = round(sumTips / countTips)
             else:
                 averageTip = 0
             
             if pd.notna(connectionDays) and connectionDays != 0:
-                oneDayTip = round(sumTips/connectionDays)
-                timeIntervalTip = round(connectionDays/countTips, 1)
+                oneDayTip = round(sumTips / connectionDays)
+                timeIntervalTip = round(connectionDays / countTips, 1)
             else:
                 oneDayTip = 0
                 timeIntervalTip = '-'
@@ -319,6 +348,9 @@ if st.session_state['authentication_status']:
             with col3:
                 st.write('Activ days: ', connectionDays)
 
+        median_all_data = tips.groupby('Company')['Amount'].median().reset_index()
+        median_all_data.columns = ['Company', 'Median_MAD']
+
             # Создание графика с помощью Altair
         AllTipsTab, CompaniesTipsTab, CompaniesActivactions, CompanyConnectionsTab, TablesTab, MapTab, UsersTab = st.tabs(['ggTips', 'Top companies', 'Companies activations', 'Company connections', 'Tables', 'Map', 'Users'])
         
@@ -346,25 +378,30 @@ if st.session_state['authentication_status']:
                     if sort_column == "Time":
                         # Преобразуем колонку времени в datetime, если это возможно
                         if time_interval in ['Week', 'Month', 'Year']:
-                            groupedTips[time_interval] = pd.to_datetime(groupedTips['WeekStart'])  # Для недель, месяцев и годов
+                            groupedTips['Period'] = pd.to_datetime(groupedTips['Period'])  # Для недель, месяцев и годов
                         else:
-                            groupedTips[time_interval] = pd.to_datetime(groupedTips[time_interval])  # Для дней или кастомных интервалов
+                            groupedTips['Period'] = pd.to_datetime(groupedTips['Period'])  # Для дней или кастомных интервалов
 
                         # Сортируем данные по времени
-                        groupedTips = groupedTips.sort_values(by=time_interval, ascending=(sort_direction == 'Ascending'))
+                        groupedTips = groupedTips.sort_values(by='Period', ascending=(sort_direction == 'Ascending'))
                         x_axis_type = 'T'  # Тип данных для оси x - временной
                     else:
-                        # Если сортировка по другим колонкам (например, ggTips или Count)
+                        # Если сортировка по другим колонкам (например, Amount или Count)
                         groupedTips = groupedTips.sort_values(by=sort_column, ascending=(sort_direction == 'Ascending'))
                         x_axis_type = 'O'  # Тип данных для оси x - категориальный (номинальный)
                 
                 # Построение графика
                 if sum_type != 'None' or count_type != 'None':
                     layers = []
-
-                    x_axis = alt.X(f'{time_interval}:{x_axis_type}',  # Указываем тип оси динамически: T для времени, O для других колонок
-                        axis=alt.Axis(title=f'{time_interval}', titleFontSize=14),
-                        sort=groupedTips[time_interval].tolist())
+                    
+                    if time_interval == 'Hour':
+                        x_axis = alt.X('Period:O',  # Категориальный тип
+                                    axis=alt.Axis(title='Hour of Day', titleFontSize=14),
+                                    sort=sorted(groupedTips['Period'].unique()))
+                    else:
+                        x_axis = alt.X('Period:T' if x_axis_type == 'T' else 'Period:N',  # Указываем тип оси динамически: T для времени, O для других колонок
+                            axis=alt.Axis(title=f'{time_interval}', titleFontSize=14),
+                            sort='x' if x_axis_type == 'T' else groupedTips['Period'].tolist())
 
                     if sum_type != 'None':
                         if sum_type == 'Column':
@@ -383,9 +420,6 @@ if st.session_state['authentication_status']:
                             x=x_axis,
                             y=alt.Y('Amount:Q', axis=alt.Axis(title='Sum of Tips')),
                             tooltip=['Period', 'Amount', 'Count']
-                        ).properties(
-                            width=chart_width,
-                            height=chart_height
                         )
                         layers.append(sum_layer)
 
@@ -406,9 +440,6 @@ if st.session_state['authentication_status']:
                             x=x_axis,
                             y=alt.Y('Count:Q', axis=alt.Axis(title='Count of Transactions', titleFontSize=14)),
                             tooltip=['Period', 'Amount', 'Count']
-                        ).properties(
-                            width=chart_width,
-                            height=chart_height
                         )
                         layers.append(count_layer)
 
@@ -420,9 +451,14 @@ if st.session_state['authentication_status']:
                         titleColor='white'
                     )
                     st.altair_chart(chart, use_container_width=True)
+
+                    if 'groupedTips' in locals():
+                        with st.expander('Table', True):
+                            st.write(groupedTips[['Week', 'Amount', 'WeekStart', 'WeekEnd']])
+
         with CompaniesTipsTab:
                 
-            companiesGroupedTips = filteredTips[filteredTips['Status']=='finished'].groupby('Company').agg({
+            companiesGroupedTips = filteredTips[filteredTips['Status'] == 'finished'].groupby('Company').agg({
                 'Amount': 'sum',
                 'uuid': 'count',
                 'WeekStart': 'max',
@@ -431,15 +467,12 @@ if st.session_state['authentication_status']:
             
             # companiesGroupedTips['Median'] = tips.groupby('Company')['Amount'].median().reset_index(drop=True)
             
-            median_all_data = tips.groupby('Company')['Amount'].median().reset_index()
-            median_all_data.columns = ['Company', 'Median']  # Переименовываем колонки для удобства
-
         # Присоединяем колонку с медианой к отфильтрованным данным
             companiesGroupedTips = companiesGroupedTips.merge(median_all_data, on='Company', how='left')
             
             companiesGroupedTips['Scope'] = companiesGroupedTips.apply(
-                lambda row: round((row['Amount'] / row['Median']) + (row['Amount'] / data['oneAverageTip']), 1) 
-                if pd.notna(row['Median']) and row['Median'] != 0 else 0, axis=1)
+                lambda row: round((row['Amount'] / row['Median_MAD']) + (row['Amount'] / data['oneAverageTip']), 1) 
+                if pd.notna(row['Median_MAD']) and row['Median_MAD'] != 0 else 0, axis=1)
             companiesGroupedTips['Scope'] = companiesGroupedTips['Scope'].fillna(0)     
             
             lastTransaction = tips.groupby('Company')['Date'].max().reset_index()
@@ -469,6 +502,7 @@ if st.session_state['authentication_status']:
                         companiesGroupedTips = companiesGroupedTips.sort_values(by=sort_column_companies, ascending=False)
                         
                     topN = st.number_input('Top N companies', value=15, step=1, min_value=1, key='topN')
+                    allcompaniesGroupedTips = companiesGroupedTips.copy()
                     companiesGroupedTips = companiesGroupedTips.head(topN)
                 
                 
@@ -495,9 +529,6 @@ if st.session_state['authentication_status']:
                         x=x_axis,
                         y=alt.Y('Amount:Q', axis=alt.Axis(title='Sum of Tips', titleFontSize=14), scale=alt.Scale(domain=[0, companiesGroupedTips['Amount'].max()])),  # Отдельная ось для Amount
                         tooltip=['Company', 'Amount', 'Count', 'Scope']
-                    ).properties(
-                        width=chart_width,
-                        height=chart_height
                     )
                     layers.append(sum_layer)
 
@@ -516,11 +547,8 @@ if st.session_state['authentication_status']:
 
                     count_layer = count_layer.encode(
                         x=x_axis,
-                        y=alt.Y('Count:Q', axis=alt.Axis(title='Count & Scope'), scale=alt.Scale(domain=[0, companiesGroupedTips['Count'].max()])),  # Общая ось для Count и Scope
+                        y=alt.Y('Count:Q', axis=alt.Axis(title='Count & Scope', titleFontSize=14), scale=alt.Scale(domain=[0, companiesGroupedTips['Count'].max()])),  # Общая ось для Count и Scope
                         tooltip=['Company', 'Amount', 'Count', 'Scope']
-                    ).properties(
-                        width=chart_width,
-                        height=chart_height
                     )
                     layers.append(count_layer)
                     
@@ -539,11 +567,8 @@ if st.session_state['authentication_status']:
 
                     scope_layer = scope_layer.encode(
                         x=x_axis,
-                        y=alt.Y('Scope:Q', axis=alt.Axis(title='Count & Scope'), scale=alt.Scale(domain=[0, companiesGroupedTips['Scope'].max()])),  # Совместная ось Y с Count
+                        y=alt.Y('Scope:Q', axis=alt.Axis(title='Count & Scope', titleFontSize=14), scale=alt.Scale(domain=[0, companiesGroupedTips['Scope'].max()])),  # Совместная ось Y с Count
                         tooltip=['Company', 'Amount', 'Count', 'Scope']
-                    ).properties(
-                        width=chart_width,
-                        height=chart_height
                     )
                     layers.append(scope_layer)
 
@@ -555,17 +580,23 @@ if st.session_state['authentication_status']:
                     titleColor='white'
                 )
                 st.altair_chart(chart, use_container_width=True)
+
+                if 'companiesGroupedTips' in locals():
+                    with st.expander('Table', True):
+                        mode = st.selectbox('Mode', ['All', 'Top N'])
+                        columns = ['Company', 'Amount', 'Count', 'Scope', 'Median_MAD', 'Days since last transaction']
+                        st.write(allcompaniesGroupedTips[columns]) if mode=='All' else st.write(companiesGroupedTips[columns])
                     
         with CompaniesActivactions:
-            
+
             cleverTips = tips.copy()
 
             if 'format_data' in st.session_state:
-                if st.session_state['format_data']=='Half':
+                if st.session_state['format_data'] == 'Half':
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        format_option = st.selectbox('Different format',('Numbers', 'Percentage'))
+                        format_option = st.selectbox('Different format', ('Numbers', 'Percentage'))
                 
                     with col2:
                         format_data_period = st.selectbox('Period format', ('Half', 'Custom'), key='format_data')
@@ -573,7 +604,7 @@ if st.session_state['authentication_status']:
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
-                        format_option = st.selectbox('Different format',('Numbers', 'Percentage'))
+                        format_option = st.selectbox('Different format', ('Numbers', 'Percentage'))
                 
                     with col2:
                         format_data_period = st.selectbox('Period format', ('Half', 'Custom'), key='format_data')
@@ -584,7 +615,7 @@ if st.session_state['authentication_status']:
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
-                    format_option = st.selectbox('Different format',('Numbers', 'Percentage'))
+                    format_option = st.selectbox('Different format', ('Numbers', 'Percentage'))
             
                 with col2:
                     format_data_period = st.selectbox('Period format', ('Half', 'Custom'), key='format_data')
@@ -592,17 +623,15 @@ if st.session_state['authentication_status']:
                 with col3:
                     period = st.number_input('Period', value=7, step=1, min_value=1, key='PeriodValue')
 
-            # Prepare 'companyActiveDays' DataFrame
+            # Подготовка DataFrame
             companyActiveDays = companies.groupby('Company')['Days'].max().reset_index()
             companyActiveDays['Company_cleaned'] = companyActiveDays['Company'].str.lower().str.replace(' ', '')
             companyActiveDays = companyActiveDays[['Company_cleaned', 'Days']]
 
             if format_data_period == 'Custom':
-                companyActiveDays = companyActiveDays[companyActiveDays['Days']>period]
+                companyActiveDays = companyActiveDays[companyActiveDays['Days'] > period]
 
-            # Prepare 'cleverTips' DataFrame
-
-            # Reset index to prevent index from becoming a column during merge
+            # Подготовка DataFrame 'cleverTips'
             cleverTips = cleverTips.reset_index(drop=True)
 
             if 'ggPayer' in cleverTips.columns:
@@ -611,10 +640,10 @@ if st.session_state['authentication_status']:
             if 'Status' in cleverTips.columns:
                 cleverTips = cleverTips[cleverTips['Status'] == 'finished']
 
-            # Create 'Company_cleaned' in 'cleverTips'
+            # Создание 'Company_cleaned' в 'cleverTips'
             cleverTips['Company_cleaned'] = cleverTips['Company'].str.lower().str.replace(' ', '')
 
-            # Merge 'cleverTips' with 'companyActiveDays' on 'Company_cleaned'
+            # Слияние с 'companyActiveDays'
             cleverTips = cleverTips.merge(
                 companyActiveDays,
                 on='Company_cleaned',
@@ -625,16 +654,16 @@ if st.session_state['authentication_status']:
             today = pd.to_datetime('today')
 
             if format_data_period == 'Half':
-                # Добавляем столбец 'date_threshold' для каждой транзакции
-                cleverTips['date_threshold'] = pd.to_datetime('today') - pd.to_timedelta(cleverTips['Days']/2, unit='D')
+                # Добавление столбца 'date_threshold'
+                cleverTips['date_threshold'] = today - pd.to_timedelta(cleverTips['Days'] / 2, unit='D')
                 
-                # Первый период (первая половина)
+                # Первый период
                 totalPeriodTips = cleverTips[cleverTips['Date'] < cleverTips['date_threshold']]
                 
-                # Второй период (вторая половина)
+                # Второй период
                 lastPeriodTips = cleverTips[cleverTips['Date'] >= cleverTips['date_threshold']]
             else:
-                # Используем заданный период
+                # Заданный период
                 period_timedelta = pd.Timedelta(days=period)
                 totalPeriodTips = cleverTips[
                     (cleverTips['Date'] < today - period_timedelta)
@@ -643,7 +672,7 @@ if st.session_state['authentication_status']:
                     (cleverTips['Date'] >= today - period_timedelta)
                 ]
 
-            # Group 'totalPeriodTips' to get 'totalPeriodScopes'
+            # Группировка 'totalPeriodTips'
             totalPeriodScopes = totalPeriodTips.groupby('Company').agg({
                 'Amount': 'sum',
                 'uuid': 'count'
@@ -651,27 +680,25 @@ if st.session_state['authentication_status']:
 
             totalPeriodScopes['Company_cleaned'] = totalPeriodScopes['Company'].str.lower().str.replace(' ', '')
 
-            # Rename columns in 'median_all_data' to avoid conflicts
-            median_all_data = median_all_data.rename(columns={'Median': 'Median_MAD'})
 
-            # Merge 'totalPeriodScopes' with 'median_all_data' on 'Company'
+            # Слияние с 'median_all_data'
             totalPeriodScopes = totalPeriodScopes.merge(
                 median_all_data[['Company', 'Median_MAD']],
                 on='Company',
                 how='left'
             )
 
-            # Merge 'totalPeriodScopes' with 'companyActiveDays' on 'Company_cleaned'
+            # Слияние с 'companyActiveDays'
             totalPeriodScopes = totalPeriodScopes.merge(
                 companyActiveDays,
                 on='Company_cleaned',
                 how='left'
             )
 
-            # Drop 'Company_cleaned' if it's no longer needed
+            # Удаление 'Company_cleaned'
             totalPeriodScopes.drop(columns=['Company_cleaned'], inplace=True)
 
-            # Group 'lastPeriodTips'
+            # Группировка 'lastPeriodTips'
             lastPeriodTips = lastPeriodTips.groupby('Company').agg({
                 'Amount': 'sum',
                 'uuid': 'count'
@@ -679,25 +706,25 @@ if st.session_state['authentication_status']:
 
             lastPeriodTips['Company_cleaned'] = lastPeriodTips['Company'].str.lower().str.replace(' ', '')
 
-            # Merge 'lastPeriodTips' with 'median_all_data' on 'Company'
+            # Слияние с 'median_all_data'
             lastPeriodTips = lastPeriodTips.merge(
                 median_all_data[['Company', 'Median_MAD']],
                 on='Company',
                 how='left'
             )
 
-            # Merge 'lastPeriodTips' with 'companyActiveDays' on 'Company_cleaned'
+            # Слияние с 'companyActiveDays'
             lastPeriodTips = lastPeriodTips.merge(
                 companyActiveDays,
                 on='Company_cleaned',
                 how='left'
             )
 
-            # Drop 'Company_cleaned' if it's no longer needed
+            # Удаление 'Company_cleaned'
             lastPeriodTips.drop(columns=['Company_cleaned'], inplace=True)
 
             def calculate_scope(row, period_length):
-                if pd.notna(row['Median_MAD']) and row['Median_MAD'] != 0 and period_length > 0 and row['Days']>period_length:
+                if pd.notna(row['Median_MAD']) and row['Median_MAD'] != 0 and period_length > 0 and row['Days'] > period_length:
                     return round(
                         (
                             (row['Amount'] / row['Median_MAD']) +
@@ -708,31 +735,30 @@ if st.session_state['authentication_status']:
                 else:
                     return 0
                 
-            if format_data_period=="Custom":
+            if format_data_period == "Custom":
                 totalPeriodScopes['Scope'] = totalPeriodScopes.apply(
                     lambda row: calculate_scope(row, row['Days'] - period),
                     axis=1
                 )
             else:
-                    totalPeriodScopes['Scope'] = totalPeriodScopes.apply(
-                    lambda row: calculate_scope(row, row['Days']/2),
+                totalPeriodScopes['Scope'] = totalPeriodScopes.apply(
+                    lambda row: calculate_scope(row, row['Days'] / 2),
                     axis=1
                 )
 
-            # Расчет 'Scope' для последнего периода
-            if format_data_period=="Custom":
+            # Расчёт 'Scope' для последнего периода
+            if format_data_period == "Custom":
                 lastPeriodTips['Scope'] = lastPeriodTips.apply(
                     lambda row: calculate_scope(row, period),
                     axis=1
                 )
             else:
                 lastPeriodTips['Scope'] = lastPeriodTips.apply(
-                    lambda row: calculate_scope(row, row['Days']/2),
+                    lambda row: calculate_scope(row, row['Days'] / 2),
                     axis=1
                 )
 
-            # Display 'lastPeriodTips' DataFrame
-
+            # Объединение данных
             mergedScopes = pd.merge(
                 totalPeriodScopes[['Company', 'Scope']],
                 lastPeriodTips[['Company', 'Scope']],
@@ -741,23 +767,23 @@ if st.session_state['authentication_status']:
                 suffixes=('_first_period', '_second_period')
             )
 
-            # Заполняем отсутствующие значения нулями
+            # Заполнение отсутствующих значений
             mergedScopes.fillna(0, inplace=True)
 
-            # Вычисляем differentScope в зависимости от выбранного формата
+            # Вычисление differentScope
             mergedScopes['differentScopeNumbers'] = mergedScopes['Scope_second_period'] - mergedScopes['Scope_first_period'] 
 
             def calculate_percentage(row):
                 if row['Scope_first_period'] != 0:
                     return ((row['Scope_second_period'] - row['Scope_first_period']) / row['Scope_first_period']) * 100
                 else:
-                    if row['Scope_second_period'] !=0:
+                    if row['Scope_second_period'] != 0:
                         return 300
                     else:
                         return 0
             mergedScopes['differentScopePercentage'] = mergedScopes.apply(calculate_percentage, axis=1)
 
-            # Ограничиваем значения differentScope до 200 и устанавливаем цвет фиолетовым для значений >200
+            # Ограничение значений и установка цветов
             def set_color(value):
                 if value >= 300:
                     return 'blue'
@@ -771,16 +797,12 @@ if st.session_state['authentication_status']:
             mergedScopes['color'] = mergedScopes['differentScopePercentage'].apply(set_color)
 
             mergedScopes['differentScopePercentageAtChar'] = mergedScopes['differentScopePercentage'].apply(
-                lambda x: x if x<=300 else 300
+                lambda x: x if x <= 300 else 300
             )
 
-            # mergedScopes['differentScope'] = mergedScopes['differentScope'].apply(lambda x: min(x, 300))
-
-            # Сортируем данные по differentScope от большего к меньшему
-
-            # Данные для графика (где differentScope не равен 0)
-            differentScopeFormat = 'differentScopeNumbers' if format_option=='Numbers' else 'differentScopePercentageAtChar'
-            differentScopeFormatWihoutLimit = 'differentScopeNumbers' if format_option=='Numbers' else 'differentScopePercentage'
+            # Сортировка данных
+            differentScopeFormat = 'differentScopeNumbers' if format_option == 'Numbers' else 'differentScopePercentageAtChar'
+            differentScopeFormatWihoutLimit = 'differentScopeNumbers' if format_option == 'Numbers' else 'differentScopePercentage'
             
             mergedScopes = mergedScopes.sort_values(by=f'{differentScopeFormatWihoutLimit}', ascending=False)
 
@@ -795,7 +817,7 @@ if st.session_state['authentication_status']:
                 )
             ]
 
-            # Данные для таблицы:
+            # Данные для таблицы
             table_data = mergedScopes[
                 (mergedScopes['Scope_first_period'] == 0) &
                 (mergedScopes['Scope_second_period'] == 0)
@@ -804,26 +826,26 @@ if st.session_state['authentication_status']:
             # Убедимся, что differentScope не содержит NaN
             chart_data[differentScopeFormat] = chart_data[differentScopeFormat].fillna(0)
 
-            # Создаем список всех компаний для оси X
+            # Список компаний для оси X
             company_list = chart_data['Company'].tolist()
 
-            # Настраиваем ось X
+            # Настройка оси X
             x_axis = alt.X('Company:N', sort=company_list, axis=alt.Axis(
                 title='Company',
                 labelFontSize=10,      # Уменьшение размера шрифта меток
                 labelOverlap='greedy'  # Предотвращение перекрытия меток
             ))
 
-            # Определяем минимальное и максимальное значение для оси Y
+            # Определение минимального и максимального значения для оси Y
             min_y = chart_data[differentScopeFormat].min()
             max_y = chart_data[differentScopeFormat].max()
 
-            # Если min_y и max_y равны, добавим небольшой диапазон
+            # Добавление диапазона, если min_y и max_y равны
             if min_y == max_y:
                 min_y -= 1
                 max_y += 1
 
-            # Настраиваем ось Y
+            # Настройка оси Y
             y_axis = alt.Y(f'{differentScopeFormat}:Q', 
                         axis=alt.Axis(title='Different Scope'),
                         scale=alt.Scale(domain=[min_y, max_y]))
@@ -832,9 +854,6 @@ if st.session_state['authentication_status']:
             base_chart = alt.Chart(chart_data).encode(
                 x=x_axis,
                 tooltip=['Company', differentScopeFormatWihoutLimit, 'Scope_first_period', 'Scope_second_period']
-            ).properties(
-                width=800,
-                height=400
             )
 
             # Столбцы для differentScope != 0
@@ -852,24 +871,25 @@ if st.session_state['authentication_status']:
                 y=f'{differentScopeFormat}:Q'
             )
 
-            # Комбинируем графики
+            # Комбинирование графиков
             final_chart = alt.layer(bar_chart, zero_chart).resolve_scale(
                 y='shared'
             )
 
+            # Слияние с 'companyActiveDays'
             mergedScopes['Company_cleaned'] = mergedScopes['Company'].str.lower().str.replace(' ', '')
             mergedScopesWithDays = mergedScopes.merge(
                 companyActiveDays[['Company_cleaned', 'Days']],
-                on = 'Company_cleaned',
-                how = 'left'
+                on='Company_cleaned',
+                how='left'
             )
 
             with st.expander('stats'):
-                growCompaniesCount = mergedScopesWithDays[mergedScopesWithDays['differentScopeNumbers']>0]['Company'].count()
-                decreaseCompaniesCount = mergedScopesWithDays[mergedScopesWithDays['differentScopeNumbers']<0]['Company'].count()
-                sameStatusCompaniesCount = mergedScopesWithDays[mergedScopesWithDays['differentScopeNumbers']==0]['Company'].count()
-                activeCompanies = mergedScopesWithDays[mergedScopesWithDays['Scope_second_period']>0]['Company'].count()
-                passiveCompanies = mergedScopesWithDays[mergedScopesWithDays['Scope_second_period']==0]['Company'].count()
+                growCompaniesCount = mergedScopesWithDays[mergedScopesWithDays['differentScopeNumbers'] > 0]['Company'].count()
+                decreaseCompaniesCount = mergedScopesWithDays[mergedScopesWithDays['differentScopeNumbers'] < 0]['Company'].count()
+                sameStatusCompaniesCount = mergedScopesWithDays[mergedScopesWithDays['differentScopeNumbers'] == 0]['Company'].count()
+                activeCompanies = mergedScopesWithDays[mergedScopesWithDays['Scope_second_period'] > 0]['Company'].count()
+                passiveCompanies = mergedScopesWithDays[mergedScopesWithDays['Scope_second_period'] == 0]['Company'].count()
 
                 col1, col2, col3 = st.columns(3)
 
@@ -889,42 +909,39 @@ if st.session_state['authentication_status']:
 
                 with col2:
                     st.write('Zero tip: ', passiveCompanies, 'companies')
-                                
-            # Отображаем график
+            
+            # Отображение графика
             st.altair_chart(final_chart, use_container_width=True)
 
-
-
-            if format_data_period=='Custom':
+            # Отображение таблицы
+            if format_data_period == 'Custom':
                 st.dataframe(mergedScopesWithDays.loc[mergedScopesWithDays['Days'] > period, ['Company', 'Scope_first_period', 'Scope_second_period', 'differentScopeNumbers', 'differentScopePercentage', 'Days']])
             else:
                 st.dataframe(mergedScopesWithDays[['Company', 'Scope_first_period', 'Scope_second_period', 'differentScopeNumbers', 'differentScopePercentage', 'Days']])
-
 
         with CompanyConnectionsTab:
             if not date_range:
                 start_date = pd.to_datetime('2024-01-01')
                 end_date = pd.to_datetime('today')
 
-            # Преобразуем колонки Start и End в формат datetime
-            companies['Start'] = pd.to_datetime(companies['Start'])
-            companies['End'] = pd.to_datetime(companies['End'])
+            # Преобразование колонок Start и End в datetime
+            companies['Start'] = pd.to_datetime(companies['Start'], errors='coerce')
+            companies['End'] = pd.to_datetime(companies['End'], errors='coerce')
 
-            # Генерируем диапазон дат с учетом выбранного фильтра
+            # Генерация диапазона дат
             date_range = pd.date_range(start=start_date, end=end_date)
 
-            # Подсчет активных бренчей и уникальных компаний на каждую дату в диапазоне
+            # Подсчёт активных бренчей и уникальных компаний
             active_companies_per_day = []
 
             for date in date_range:
-                # Подсчет активных бренчей
-                active_branches = companies[(companies['Start'].notna()) & 
-                                            ((companies['End'].isna()) | (companies['End'] >= date)) & 
-                                            (companies['Start'] <= date)]
+                active_branches = companies[
+                    (companies['Start'].notna()) & 
+                    ((companies['End'].isna()) | (companies['End'] >= date)) & 
+                    (companies['Start'] <= date)
+                ]
                 
                 active_branches_count = active_branches.shape[0]
-                
-                # Подсчет активных уникальных компаний
                 unique_active_companies_count = active_branches['HELPERcompanyName'].nunique()
                 
                 active_companies_per_day.append({
@@ -933,14 +950,14 @@ if st.session_state['authentication_status']:
                     'Active Companies': unique_active_companies_count
                 })
 
-            # Преобразуем результат в DataFrame
+            # Преобразование в DataFrame
             active_companies_df = pd.DataFrame(active_companies_per_day)
 
-            # Рассчитываем изменения по дням (разница между текущим и предыдущим днем)
+            # Рассчёт изменений по дням
             active_companies_df['Branches Change'] = active_companies_df['Active Branches'].diff().fillna(0)
             active_companies_df['Companies Change'] = active_companies_df['Active Companies'].diff().fillna(0)
 
-            # Применяем фильтр по timeInterval (группировка данных)
+            # Применение фильтра по timeInterval
             if st.session_state['timeInterval'] == 'Week':
                 active_companies_df['Date'] = active_companies_df['Date'].dt.to_period('W').apply(lambda r: r.start_time)
             elif st.session_state['timeInterval'] == 'Month':
@@ -953,7 +970,7 @@ if st.session_state['authentication_status']:
                 custom_interval = st.session_state.get('customInterval', 10)
                 active_companies_df['Date'] = active_companies_df['Date'] - pd.to_timedelta(active_companies_df['Date'].dt.dayofyear % custom_interval, unit='D')
 
-            # Группируем данные по выбранному timeInterval
+            # Группировка данных
             grouped_data = active_companies_df.groupby('Date').agg({
                 'Active Branches': 'max',
                 'Active Companies': 'max',
@@ -961,14 +978,14 @@ if st.session_state['authentication_status']:
                 'Companies Change': 'sum'
             }).reset_index()
 
-            # Линейный график для отображения активных бренчей и компаний
-            line_chart = alt.Chart(grouped_data).mark_line(color='blue').encode(
+            # Линейные графики
+            line_chart = alt.Chart(grouped_data).mark_line(color='green').encode(
                 x=alt.X('Date:T', title='Date'),
                 y=alt.Y('Active Branches:Q', title='Active Branches/Companies'),
                 tooltip=['Date:T', 'Active Branches:Q']
             )
 
-            companies_line_chart = alt.Chart(grouped_data).mark_line(color='red').encode(
+            companies_line_chart = alt.Chart(grouped_data).mark_line(color='blue').encode(
                 x=alt.X('Date:T', title='Date'),
                 y=alt.Y('Active Companies:Q', title='Active Branches/Companies'),
                 tooltip=['Date:T', 'Active Companies:Q']
@@ -981,23 +998,17 @@ if st.session_state['authentication_status']:
 
             st.altair_chart(combined_line_chart, use_container_width=True)
 
-            # Столбчатый график для отображения изменений
-            bar_chart_branches = alt.Chart(grouped_data).mark_bar(color='blue').encode(
+            # Столбчатые графики
+            bar_chart_branches = alt.Chart(grouped_data).mark_bar(color='green').encode(
                 x=alt.X('Date:T', title='Date'),
                 y=alt.Y('Branches Change:Q', title='Daily Change'),
                 tooltip=['Date:T', 'Branches Change:Q']
-            ).properties(
-                width=800,
-                height=200
             )
 
-            bar_chart_companies = alt.Chart(grouped_data).mark_bar(color='red').encode(
+            bar_chart_companies = alt.Chart(grouped_data).mark_bar(color='blue').encode(
                 x=alt.X('Date:T', title='Date'),
                 y=alt.Y('Companies Change:Q', title='Daily Change'),
                 tooltip=['Date:T', 'Companies Change:Q']
-            ).properties(
-                width=800,
-                height=200
             )
 
             combined_bar_chart = alt.layer(bar_chart_branches, bar_chart_companies).configure_axis(
@@ -1007,8 +1018,9 @@ if st.session_state['authentication_status']:
 
             st.altair_chart(combined_bar_chart, use_container_width=True)
 
+            with st.expander('Table', True):
+                st.write(grouped_data)
 
-            
         with MapTab:
             st.write('Companies')
             

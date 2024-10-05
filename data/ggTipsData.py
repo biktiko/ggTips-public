@@ -107,7 +107,11 @@ def load_data(file_path=None):
                                 df = replace_values(df)
 
                                 if 'Date' in df.columns:
-                                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                                    # Установка dayfirst в зависимости от листа
+                                    if sheet.lower() == 'superadmin':
+                                        df['Date'] = pd.to_datetime(df['Date'], dayfirst=False, errors='coerce')
+                                    else:
+                                        df['Date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
 
                                 # Проверка наличия столбца 'uuid'
                                 if 'uuid' in df.columns:
@@ -139,7 +143,6 @@ def load_data(file_path=None):
                             print(f"'ID' or 'NUMBER' column not found in the sheet {sheet}")
 
     if 'Date' in Tips.columns:
-        Tips['Date'] = pd.to_datetime(Tips['Date'], errors='coerce')
         Tips = Tips[Tips['Date'].dt.year > 2023]
         Tips['Week'] = Tips['Date'].dt.isocalendar().week
         Tips['Hour'] = Tips['Date'].dt.hour
@@ -155,7 +158,11 @@ def load_data(file_path=None):
         Tips['Partner'] = Tips['Partner'].astype(str)
         Tips['companyPartner'] = Tips['Company'] + '_' + Tips['Partner']
     
-    oneAverageTip = Tips[Tips['Amount'] > 100]['Amount'].sum() / Tips[Tips['Amount'] > 100]['Amount'].count()
+    # Проверка наличия чаевых с Amount > 100, чтобы избежать деления на ноль
+    if not Tips[Tips['Amount'] > 100].empty:
+        oneAverageTip = Tips[Tips['Amount'] > 100]['Amount'].sum() / Tips[Tips['Amount'] > 100]['Amount'].count()
+    else:
+        oneAverageTip = 0
     
     defaultInputs = {
         'selectedMonth': [],

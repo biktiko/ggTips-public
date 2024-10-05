@@ -41,13 +41,16 @@ def login():
             st.rerun()  # Перезапуск страницы для загрузки демо-режима
 
     return authenticator
-def formatTimeIntervals(df, time_interval):
-    if time_interval == 'Month':
-        df['Month'] = pd.Categorical(df['Month'].apply(lambda x: calendar.month_name[x]), 
-                                     categories=calendar.month_name[1:], 
-                                     ordered=True)
-    elif time_interval == 'Week day':
-        df['Week day'] = pd.Categorical(df['Week day'].apply(lambda x: calendar.day_name[x]), 
-                                        categories=calendar.day_name, 
-                                        ordered=True)
-    return df
+# def formatTimeIntervals(df, time_interval):
+#     if time_interval == 'Month':
+#         df['Month'] = pd.Categorical(df['Month'].apply(lambda x: calendar.month_name[x]), 
+#                                      categories=calendar.month_name[1:], 
+#                                      ordered=True)
+#     elif time_interval == 'Week day':
+#         df['Week day'] = pd.Categorical(df['Week day'].apply(lambda x: calendar.day_name[x]), 
+#                                         categories=calendar.day_name, 
+#                                         ordered=True)
+#     return df
+
+
+
