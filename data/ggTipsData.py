@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+# import streamlit as st # then remove
 
 uploadFilesPath = 'data/uploads/'
 
@@ -46,7 +47,7 @@ def load_data(file_path=None):
 
     tablesKeyWords = {
         'Tips': ['uuid', 'Meta Data', 'Review comment', 'paymentStateId', 'error_desc', 'remote_order_id', 'Payment processor', 'status'],
-        'Companies': ['helpercompanyname', 'Adress', 'Working status', 'Coordinate', 'Region']
+        'Companies': ['helpercompanyname', 'Adress', 'Working status', 'Coordinate']
     }
 
     columnsKeyWords = {
@@ -131,6 +132,7 @@ def load_data(file_path=None):
                                     print(f"'uuid' column not found in the sheet {sheet}")
                         elif table == 'Companies':
                             df_companies = pd.read_excel(newExcelFile, sheet_name=sheet)
+                            # st.write(df_companies)
                             companies = pd.concat([companies, df_companies])
 
                     elif sheet.lower() == 'gg teammates' or sheet.lower() == 'gg_teammates':

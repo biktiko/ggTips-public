@@ -196,6 +196,8 @@ if st.session_state['authentication_status']:
                 reset_button = st.button('Reset Settings')
 
         if 'Working status' in filteredCompanies:
+            filteredCompanies['Working status'] = filteredCompanies['Working status'].fillna(False).astype(bool)
+        # Теперь можно безопасно фильтровать
             filteredCompanies = filteredCompanies[filteredCompanies['Working status']]
 
         os.makedirs(uploadFilesPath, exist_ok=True)
@@ -1039,23 +1041,28 @@ if st.session_state['authentication_status']:
                     return None, None
 
             # Создаем базовую карту
-            first_coordinate = filteredCompanies['Coordinate'].iloc[0]
-            initial_lat, initial_lon = split_coordinates(first_coordinate)
-            if initial_lat is not None and initial_lon is not None:
-                m = folium.Map(location=[initial_lat, initial_lon], zoom_start=12)
+            if not filteredCompanies.empty:
+                first_coordinate = filteredCompanies['Coordinate'].iloc[0]
+                initial_lat, initial_lon = split_coordinates(first_coordinate)
+                if initial_lat is not None and initial_lon is not None:
+                    m = folium.Map(location=[initial_lat, initial_lon], zoom_start=12)
+                else:
+                    m = folium.Map(location=[40.1792, 44.4991], zoom_start=12)  # Координаты по умолчанию
             else:
-                m = folium.Map(location=[40.1792, 44.4991], zoom_start=12)  # В случае ошибки, ставим координаты Еревана как центр
+                m = folium.Map(location=[40.1792, 44.4991], zoom_start=12)  # Координаты по умолчанию
 
             # Добавляем маркеры для каждой компании
             for index, row in filteredCompanies.iterrows():
                 lat, lon = split_coordinates(row['Coordinate'])
                 if lat is not None and lon is not None:
-                    folium.Marker([lat, lon], 
-                                popup=f"{row['Company']} ({row['Adress']})").add_to(m)
+                    folium.Marker(
+                        [lat, lon], 
+                        popup=f"{row['Company']} ({row['Adress']})"
+                    ).add_to(m)
 
-            # Отображаем карту в Streamlit
+            # Отображаем карту в Streamlit с заданными размерами
             st.title('Map of Company Locations')
-            folium_static(m)         
+            folium_static(m, width=1000, height=650)   
             
         with UsersTab:
             

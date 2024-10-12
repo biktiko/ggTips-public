@@ -1,14 +1,14 @@
 working email, avatar, partnerMessage, json_agg, Real? -> Partners
 
-3 talbeKeyWords upgrade
+3  talbeKeyWords upgrade
 5. reset button
 6. հանդիպումների քարտեզ
 9. save filters to cache
 11. terminal possible errors check with chat gpt
 12. comments to english
-24 set custom limit for companies activities
 25 Capital letters at companies-tips
 26 last tip info in stats
+27 join last visit info
 
 completed
 13. fix hours. sometimes +4. sometimes not
@@ -25,7 +25,7 @@ completed
 22 stats for different scope
 28 import data to sidebar
 27 users table ggpayer to int
-
+24 set custom limit for companies activities
 
 
 
