@@ -161,10 +161,10 @@ def load_data(file_path=None):
         Tips['companyPartner'] = Tips['Company'] + '_' + Tips['Partner']
     
     # Проверка наличия чаевых с Amount > 100, чтобы избежать деления на ноль
-    if not Tips[Tips['Amount'] > 100].empty:
-        oneAverageTip = Tips[Tips['Amount'] > 100]['Amount'].sum() / Tips[Tips['Amount'] > 100]['Amount'].count()
-    else:
-        oneAverageTip = 0
+    # if not Tips[Tips['Amount'] > 100].empty:
+    #     oneAverageTip = Tips[Tips['Amount'] > 100]['Amount'].sum() / Tips[Tips['Amount'] > 100]['Amount'].count()
+    # else:
+    #     oneAverageTip = 0
     
     defaultInputs = {
         'selectedMonth': [],
@@ -175,15 +175,18 @@ def load_data(file_path=None):
         'paymentProcessor': [],
         'Status': ['finished'] if not Tips.empty and 'Status' in Tips.columns and 'finished' in Tips['Status'].values else [],
         'selectedCompanies': [],
-        'selectedPartner': []
+        'selectedPartner': [],
+        'medianWeight': 0.75,
+        'amountWeight': 1,
+        'countWeight': 1,
+
     }
 
     data = {
         'tips': Tips,
         'companies': companies,
         'defaultInputs': defaultInputs,
-        'ggTeammates': ggTeammates,
-        'oneAverageTip': oneAverageTip
+        'ggTeammates': ggTeammates
     }
 
     return data

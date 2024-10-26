@@ -7,6 +7,7 @@ from ggtipsconfig import login  # Удалите импорт formatTimeInterval
 import folium
 from streamlit_folium import folium_static
 import calendar
+import numpy as np
 
 st.set_page_config(layout='wide')
 
@@ -195,6 +196,34 @@ if st.session_state['authentication_status']:
                 column_size = st.slider('Column Size', 3, 30, 15)
                 reset_button = st.button('Reset Settings')
 
+            with st.expander('**Advanced**'):
+                # st.number_input(
+                #     'Median component weight', 
+                #     value=float(st.session_state['medianWeight']), 
+                #     step=0.25, 
+                #     min_value=0.0,    # Приведение к float
+                #     max_value=10.0,   # Приведение к float
+                #     key='medianWeight'
+                # )
+                st.write('Components for scoring ')
+                st.number_input(
+                    'Amout weight', 
+                    value=float(st.session_state['amountWeight']), 
+                    step=0.25, 
+                    min_value=0.0,    # Приведение к float
+                    max_value=10.0,   # Приведение к float
+                    key='amountWeight'
+                )
+                st.number_input(
+                    'Count weight', 
+                    value=float(st.session_state['countWeight']), 
+                    step=0.25, 
+                    min_value=0.0,    # Приведение к float
+                    max_value=10.0,   # Приведение к float
+                    key='countWeight'
+                )
+                st.write("Scope = Amount weight * ( Tips amount / one Average Tip ) + count Weight * Tips Count")
+                                
         if 'Working status' in filteredCompanies:
             filteredCompanies['Working status'] = filteredCompanies['Working status'].fillna(False).astype(bool)
         # Теперь можно безопасно фильтровать
@@ -295,18 +324,16 @@ if st.session_state['authentication_status']:
                         
         with st.expander('stats'):
             
-            # st.write( data['oneAverageTip'])
-            
             sumTips = int(groupedTips['Amount'].sum())
             countTips = groupedTips['Count'].sum()
             connectionDays = filteredCompanies['Days'].max()
             companiesCount = int(companies.groupby('HELPERcompanyName')['Working status'].max().sum())
             branchesCount = companies['Working status'].sum() 
 
-            if countTips !=0:
-                averageTip = round(sumTips / countTips)
+            if not filteredTips[filteredTips['Amount'] > 100].empty:
+                oneAverageTip = int(round(filteredTips[filteredTips['Amount'] > 100]['Amount'].sum() / filteredTips[filteredTips['Amount'] > 100]['Amount'].count(), 0))
             else:
-                averageTip = 0
+                oneAverageTip = 0
             
             if pd.notna(connectionDays) and connectionDays != 0:
                 oneDayTip = round(sumTips / connectionDays)
@@ -335,7 +362,7 @@ if st.session_state['authentication_status']:
                 st.write('Count: ', countTips)
                 
             with col3:
-                st.write('One average tip', averageTip)
+                st.write('One average tip', oneAverageTip)
                 
             # st.write(oneAver)
                 
@@ -351,6 +378,8 @@ if st.session_state['authentication_status']:
                 st.write('Activ days: ', connectionDays)
 
         median_all_data = tips.groupby('Company')['Amount'].median().reset_index()
+        # median_all_data = filteredTips.groupby('Company').apply(lambda g: np.median(np.repeat(g['Amount'], g['Count']))).reset_index(name='Median_MAD')
+
         median_all_data.columns = ['Company', 'Median_MAD']
 
             # Создание графика с помощью Altair
@@ -474,11 +503,18 @@ if st.session_state['authentication_status']:
             
         # Присоединяем колонку с медианой к отфильтрованным данным
             companiesGroupedTips = companiesGroupedTips.merge(median_all_data, on='Company', how='left')
-            
+            st.write(st.session_state['amountWeight'])
             companiesGroupedTips['Scope'] = companiesGroupedTips.apply(
-                lambda row: round((row['Amount'] / row['Median_MAD']) + (row['Amount'] / data['oneAverageTip']), 1) 
+                lambda row: round(
+                        ( 
+                            # st.session_state['medianWeight'] * (row['Amount'] / row['Median_MAD']) + 
+                            st.session_state['amountWeight'] * (row['Amount'] / oneAverageTip) + 
+                            st.session_state['countWeight'] * row['Count']
+                        ) / 2,
+                        1
+                    )
                 if pd.notna(row['Median_MAD']) and row['Median_MAD'] != 0 else 0, axis=1)
-            companiesGroupedTips['Scope'] = companiesGroupedTips['Scope'].fillna(0)     
+            companiesGroupedTips['Scope'] = companiesGroupedTips['Scope'].fillna(0)  
             
             lastTransaction = tips.groupby('Company')['Date'].max().reset_index()
             lastTransaction.columns = ['Company', 'Last transaction']
@@ -586,11 +622,28 @@ if st.session_state['authentication_status']:
                 )
                 st.altair_chart(chart, use_container_width=True)
 
-                if 'companiesGroupedTips' in locals():
-                    with st.expander('Table', True):
-                        mode = st.selectbox('Mode', ['All', 'Top N'])
-                        columns = ['Company', 'Amount', 'Count', 'Scope', 'Median_MAD', 'Days since last transaction']
-                        st.write(allcompaniesGroupedTips[columns]) if mode=='All' else st.write(companiesGroupedTips[columns])
+            if 'companiesGroupedTips' in locals():
+                with st.expander('Table', True):
+                    mode = st.selectbox('Mode', ['All', 'Top N'])
+                    columns = ['Company', 'Amount', 'Count', 'Scope', 'Median_MAD', 'Days since last transaction']
+                    
+                    if mode == 'All':
+                        df = allcompaniesGroupedTips[columns].copy()
+                    else:
+                        df = companiesGroupedTips[columns].copy()
+                    
+                    # Сортировка по 'Scope' в порядке убывания
+                    df = df.sort_values(by='Scope', ascending=False).reset_index(drop=True)
+                    
+                    # Добавление столбца 'Top N'
+                    df['Top N'] = df['Scope'].rank(method='dense', ascending=False).astype(int)
+                    
+                     # Обновление списка столбцов для отображения, включая 'Top N'
+                    columns = ['Top N'] + columns
+                    
+                    # Отображение таблицы
+                    st.write(df[columns])
+
                     
         with CompaniesActivactions:
 
@@ -733,7 +786,7 @@ if st.session_state['authentication_status']:
                     return round(
                         (
                             (row['Amount'] / row['Median_MAD']) +
-                            (row['Amount'] / data['oneAverageTip'])
+                            (row['Amount'] / oneAverageTip)
                         ) / period_length,
                         1
                     )
