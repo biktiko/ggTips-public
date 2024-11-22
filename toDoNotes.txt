@@ -9,6 +9,8 @@ working email, avatar, partnerMessage, json_agg, Real? -> Partners
 25 Capital letters at companies-tips
 26 last tip info in stats
 27 join last visit info
+! 28 companies group table new filter / connected or not connected 
+
 
 completed
 13. fix hours. sometimes +4. sometimes not
@@ -27,6 +29,6 @@ completed
 27 users table ggpayer to int
 24 set custom limit for companies activities
 
-
+pass 
 
 

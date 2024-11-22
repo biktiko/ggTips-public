@@ -106,7 +106,6 @@ if st.session_state['authentication_status']:
                 st.session_state[setting] = defaultInputs[setting]
 
         filteredTips = tips.copy()
-        filteredCompanies = companies.copy()
 
         if not tips.empty:
             with st.expander('ggTips filters', True):
@@ -223,10 +222,11 @@ if st.session_state['authentication_status']:
                     key='countWeight'
                 )
                 st.write("Scope = Amount weight * ( Tips amount / one Average Tip ) + count Weight * Tips Count")
-                                
+
+        filteredCompanies = companies.copy()
+
         if 'Working status' in filteredCompanies:
             filteredCompanies['Working status'] = filteredCompanies['Working status'].fillna(False).astype(bool)
-        # Теперь можно безопасно фильтровать
             filteredCompanies = filteredCompanies[filteredCompanies['Working status']]
 
         os.makedirs(uploadFilesPath, exist_ok=True)
@@ -498,12 +498,11 @@ if st.session_state['authentication_status']:
                 'WeekStart': 'max',
                 'WeekEnd': 'max'
             }).reset_index().rename(columns={'uuid': 'Count', 'Amount': 'Amount'})
-            
+
             # companiesGroupedTips['Median'] = tips.groupby('Company')['Amount'].median().reset_index(drop=True)
             
         # Присоединяем колонку с медианой к отфильтрованным данным
             companiesGroupedTips = companiesGroupedTips.merge(median_all_data, on='Company', how='left')
-            st.write(st.session_state['amountWeight'])
             companiesGroupedTips['Scope'] = companiesGroupedTips.apply(
                 lambda row: round(
                         ( 
@@ -626,7 +625,7 @@ if st.session_state['authentication_status']:
                 with st.expander('Table', True):
                     mode = st.selectbox('Mode', ['All', 'Top N'])
                     columns = ['Company', 'Amount', 'Count', 'Scope', 'Median_MAD', 'Days since last transaction']
-                    
+                    # Add this filter only for connect companies
                     if mode == 'All':
                         df = allcompaniesGroupedTips[columns].copy()
                     else:
@@ -682,7 +681,7 @@ if st.session_state['authentication_status']:
                     period = st.number_input('Period', value=7, step=1, min_value=1, key='PeriodValue')
 
             # Подготовка DataFrame
-            companyActiveDays = companies.groupby('Company')['Days'].max().reset_index()
+            companyActiveDays = filteredCompanies.groupby('Company')['Days'].max().reset_index()
             companyActiveDays['Company_cleaned'] = companyActiveDays['Company'].str.lower().str.replace(' ', '')
             companyActiveDays = companyActiveDays[['Company_cleaned', 'Days']]
 
@@ -976,6 +975,19 @@ if st.session_state['authentication_status']:
                 st.dataframe(mergedScopesWithDays.loc[mergedScopesWithDays['Days'] > period, ['Company', 'Scope_first_period', 'Scope_second_period', 'differentScopeNumbers', 'differentScopePercentage', 'Days']])
             else:
                 st.dataframe(mergedScopesWithDays[['Company', 'Scope_first_period', 'Scope_second_period', 'differentScopeNumbers', 'differentScopePercentage', 'Days']])
+
+            companiesTip = filteredCompanies.merge(
+                filteredTips,
+                on='Company',
+                how='left'
+            )
+
+            st.dataframe(companiesTip)
+            groupedCompaniesTip = companiesTip.groupby('Company').agg({
+                'Amount': 'sum'
+            }).reset_index()
+
+            st.dataframe(groupedCompaniesTip)
 
         with CompanyConnectionsTab:
             if not date_range:
