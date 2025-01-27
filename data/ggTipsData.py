@@ -21,7 +21,8 @@ def replace_values(df):
             3: 'failed',
             '1': 'success',
             1: 'success',
-            'failure': 'failed'
+            'failure': 'failed',
+            'processing': 'processing'
         }
     }
     for column, replace_dict in replacements.items():
@@ -31,7 +32,6 @@ def replace_values(df):
 
 # Функция для загрузки данных
 def load_data(file_path=None):
-        
     if file_path:
         files_to_process = [file_path]
     else:
@@ -39,7 +39,6 @@ def load_data(file_path=None):
             os.makedirs(uploadFilesPath)
         
         files_to_process = [os.path.join(uploadFilesPath, file) for file in os.listdir(uploadFilesPath)]
-
 
     Tips = pd.DataFrame()
     companies = pd.DataFrame()
@@ -53,7 +52,7 @@ def load_data(file_path=None):
     columnsKeyWords = {
         'Company': ['company', 'company name', 'company_name'],
         'Partner': ['partner', 'partner name', 'partner_name'],
-        'Date': ['date', 'createdat', 'created_at'],
+        'Date': ['date', 'createdat', 'created_at', 'transactiondate'],  # Добавлено 'transactiondate'
         'Amount': ['amount'],
         'Payment processor': ['paymentprocessor', 'payment processor', 'processor', 'payment_processor'],
         'Status': ['status', 'paymentstateid'],
@@ -61,8 +60,12 @@ def load_data(file_path=None):
         'ggPaye': ['ggpayee', 'paye'],
         'uuid': ['uuid', 'remote_order_id'],
         'ggPay': ['ggpay'],
-        'Median': ['median']
+        'Median': ['median'],
+        'SessionId': ['sessionid', 'session_id'],  # Новые ключи
+        'Email': ['email'],
+        'Name': ['name']
     }
+
 
     def ensure_columns_exist(df, columns):
         for column in columns:
@@ -79,8 +82,12 @@ def load_data(file_path=None):
         if isExcelFile(file_path):
             newExcelFile = pd.ExcelFile(file_path)
 
-
             for sheet in newExcelFile.sheet_names:
+                # Правильное сравнение названия листа
+                if sheet.lower() == 'withdrawals history':
+                    print(f"Пропускаем лист: {sheet}")
+                    continue
+
                 df_header = pd.read_excel(newExcelFile, sheet_name=sheet, nrows=0)
 
                 for table in tablesKeyWords.keys():
@@ -127,7 +134,7 @@ def load_data(file_path=None):
                                         Tips.update(df)
                                         new_rows = df.loc[~df.index.isin(Tips.index)]
                                         Tips = pd.concat([Tips, new_rows], ignore_index=False)
-                                        Tips.reset_index(inplace=True)
+                                    # Удаляем reset_index изнутри цикла
                                 else:
                                     print(f"'uuid' column not found in the sheet {sheet}")
                         elif table == 'Companies':
@@ -135,7 +142,7 @@ def load_data(file_path=None):
                             # st.write(df_companies)
                             companies = pd.concat([companies, df_companies])
 
-                    elif sheet.lower() == 'gg teammates' or sheet.lower() == 'gg_teammates':
+                    elif sheet.lower() in ['gg teammates', 'gg_teammates']:
                         df_teammates = pd.read_excel(newExcelFile, sheet_name=sheet)
 
                         if 'ID' in df_teammates.columns and 'NUMBER' in df_teammates.columns:
@@ -144,6 +151,17 @@ def load_data(file_path=None):
                         else:
                             print(f"'ID' or 'NUMBER' column not found in the sheet {sheet}")
 
+    # Сброс индекса после обработки всех файлов и листов
+    if not Tips.empty:
+        try:
+            Tips.reset_index(inplace=True)
+        except ValueError as e:
+            print(f"Ошибка при сбросе индекса: {e}")
+            # Дополнительно можно удалить столбец 'level_0', если он уже существует
+            if 'level_0' in Tips.columns:
+                Tips = Tips.drop(columns=['level_0'])
+                Tips.reset_index(inplace=True)
+    
     if 'Date' in Tips.columns:
         Tips = Tips[Tips['Date'].dt.year > 2023]
         Tips['Week'] = Tips['Date'].dt.isocalendar().week
@@ -160,12 +178,6 @@ def load_data(file_path=None):
         Tips['Partner'] = Tips['Partner'].astype(str)
         Tips['companyPartner'] = Tips['Company'] + '_' + Tips['Partner']
     
-    # Проверка наличия чаевых с Amount > 100, чтобы избежать деления на ноль
-    # if not Tips[Tips['Amount'] > 100].empty:
-    #     oneAverageTip = Tips[Tips['Amount'] > 100]['Amount'].sum() / Tips[Tips['Amount'] > 100]['Amount'].count()
-    # else:
-    #     oneAverageTip = 0
-    
     defaultInputs = {
         'selectedMonth': [],
         'ggPayeers': 'Without gg teammates',
@@ -179,7 +191,6 @@ def load_data(file_path=None):
         'medianWeight': 0.75,
         'amountWeight': 1,
         'countWeight': 1,
-
     }
 
     data = {
